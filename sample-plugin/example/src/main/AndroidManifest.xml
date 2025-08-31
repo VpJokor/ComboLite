@@ -48,13 +48,13 @@
 
                 <data android:scheme="package" />
             </intent-filter>
-        </receiver> <!-- 插件配置元数据 -->
+        </receiver>
         <meta-data
             android:name="plugin.id"
             android:value="example" />
         <meta-data
             android:name="plugin.version"
-            android:value="1.0.1" />
+            android:value="1.0.2" />
         <meta-data
             android:name="plugin.description"
             android:value="示例模块插件，提供了ComboLite插件化框架的各种基础使用示例" />
