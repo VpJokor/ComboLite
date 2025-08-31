@@ -22,5 +22,5 @@ import org.koin.dsl.module
 
 val diModule =
     module {
-        viewModel { PluginUpdateViewModel(get(), get()) }
+        viewModel { PluginUpdateViewModel(get(),get()) }
     }

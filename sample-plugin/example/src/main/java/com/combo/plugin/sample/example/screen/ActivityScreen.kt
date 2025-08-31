@@ -49,7 +49,6 @@ import com.combo.plugin.sample.example.component.JumpButton
 @Preview
 @Composable
 fun ActivityScreen() {
-    val scrollState = rememberScrollState()
     val context = LocalContext.current
     Scaffold(
         topBar = {
@@ -66,22 +65,34 @@ fun ActivityScreen() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(scrollState)
+                .verticalScroll(rememberScrollState())
                 .padding(paddingValues)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            JumpButton(text = "Compose 函数示例") {
+            JumpButton(
+                text = "Compose 函数示例",
+                description = "演示纯 Jetpack Compose 构建的插件Activity页面",
+            ) {
                 context.startPluginActivity(ComposeActivity::class.java)
             }
-            JumpButton(text = "XML UI 布局示例") {
+            JumpButton(
+                text = "XML UI 布局示例",
+                description = "演示使用传统 XML 布局的插件Activity页面",
+            ) {
                 context.startPluginActivity(XmlActivity::class.java)
             }
-            JumpButton(text = "生命周期示例") {
+            JumpButton(
+                text = "生命周期示例",
+                description = "监听并展示 Activity 的完整生命周期事件",
+            ) {
                 context.startPluginActivity(LifecycleActivity::class.java)
             }
-            JumpButton(text = "Intent 传递示例") {
+            JumpButton(
+                text = "Intent 传递示例",
+                description = "演示如何在插件 Activity 之间传递数据",
+            ) {
                 context.startPluginActivity(IntentSenderActivity::class.java)
             }
         }

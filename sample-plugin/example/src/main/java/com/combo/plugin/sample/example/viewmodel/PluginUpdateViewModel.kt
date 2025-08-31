@@ -17,6 +17,8 @@
 package com.combo.plugin.sample.example.viewmodel
 
 import android.app.Application
+import android.content.Intent
+import android.os.Process
 import android.widget.Toast
 import androidx.lifecycle.viewModelScope
 import com.combo.core.installer.InstallerManager
@@ -29,6 +31,7 @@ import com.combo.plugin.sample.example.state.PluginUpdateState
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.system.exitProcess
 
 class PluginUpdateViewModel(
     private val application: Application,
@@ -39,11 +42,18 @@ class PluginUpdateViewModel(
         fetchPlugins()
     }
 
-    fun fetchPlugins() {
+    private fun fetchPlugins() {
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
-            val plugins = updateManager.fetchRemotePlugins()
-            updateState { copy(isLoading = false, remotePlugins = plugins) }
+            val installed = PluginManager.getAllInstallPlugins().associate { it.pluginId to it.version }
+            val remote = updateManager.fetchRemotePlugins()
+            updateState {
+                copy(
+                    isLoading = false,
+                    remotePlugins = remote,
+                    installedPlugins = installed
+                )
+            }
         }
     }
 
@@ -73,15 +83,11 @@ class PluginUpdateViewModel(
                                 installingPlugins = installingPlugins + downloadIdentifier
                             )
                         }
-                        installPlugin(status.file, downloadIdentifier)
+                        installPlugin(pluginId, status.file, downloadIdentifier)
                     }
 
                     is DownloadStatus.Failure -> {
-                        Toast.makeText(
-                            application,
-                            "下载失败: ${status.error.message}",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(application, "下载失败: ${status.error.message}", Toast.LENGTH_SHORT).show()
                         updateState {
                             copy(
                                 downloadingPlugins = downloadingPlugins - downloadIdentifier,
@@ -95,25 +101,33 @@ class PluginUpdateViewModel(
         }
     }
 
-    private suspend fun installPlugin(pluginFile: File, downloadIdentifier: String) {
+    private suspend fun installPlugin(pluginId: String, pluginFile: File, downloadIdentifier: String) {
+        val wasPreviouslyInstalled = uiState.value.installedPlugins.containsKey(pluginId)
+
         val result = PluginManager.installerManager.installPlugin(pluginFile, true)
         updateState { copy(installingPlugins = installingPlugins - downloadIdentifier) }
+
         when (result) {
             is InstallerManager.InstallResult.Success -> {
-                Toast.makeText(
-                    application,
-                    "安装成功: ${result.pluginInfo.pluginId}",
-                    Toast.LENGTH_SHORT
-                ).show()
                 PluginManager.launchPlugin(result.pluginInfo.pluginId)
+
+                updateState {
+                    copy(installedPlugins = installedPlugins + (result.pluginInfo.pluginId to result.pluginInfo.version))
+                }
+
+                if (wasPreviouslyInstalled) {
+                    updateState {
+                        copy(
+                            showInstallSuccessDialog = true,
+                            recentlyInstalledPlugin = result.pluginInfo,
+                            restartRequired = true
+                        )
+                    }
+                }
             }
 
             is InstallerManager.InstallResult.Failure -> {
-                Toast.makeText(
-                    application,
-                    "安装失败: ${result.reason}",
-                    Toast.LENGTH_SHORT
-                ).show()
+                Toast.makeText(application, "安装失败: ${result.reason}", Toast.LENGTH_SHORT).show()
                 updateState {
                     copy(
                         isError = true,
@@ -121,6 +135,30 @@ class PluginUpdateViewModel(
                     )
                 }
             }
+        }
+    }
+
+    /**
+     * 重启整个应用程序
+     */
+    fun restartApp() {
+        val intent = application.packageManager.getLaunchIntentForPackage(application.packageName)
+        val restartIntent = Intent.makeRestartActivityTask(intent!!.component)
+        application.startActivity(restartIntent)
+        Process.killProcess(Process.myPid())
+        exitProcess(0)
+    }
+
+    /**
+     * 用户选择稍后重启（仅关闭对话框）
+     */
+    fun dismissRestartDialog() {
+        updateState {
+            copy(
+                showInstallSuccessDialog = false,
+                recentlyInstalledPlugin = null,
+                restartRequired = false
+            )
         }
     }
 }

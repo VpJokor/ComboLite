@@ -34,9 +34,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,7 +52,9 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -110,8 +114,20 @@ fun PluginHotUpdateScreen() {
                 }
             }
         }
+
+        if (uiState.showInstallSuccessDialog && uiState.restartRequired) {
+            val installedPlugin = uiState.recentlyInstalledPlugin
+            if (installedPlugin != null) {
+                InstallSuccessDialog(
+                    pluginName = installedPlugin.pluginId,
+                    onConfirm = { viewModel.restartApp() },
+                    onDismiss = { viewModel.dismissRestartDialog() }
+                )
+            }
+        }
     }
 }
+
 
 @Composable
 private fun InfoCard() {
@@ -148,49 +164,70 @@ private fun PluginUpdateCard(
     onDownload: (PluginVersionInfo) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val installedVersion = uiState.installedPlugins[plugin.id]
 
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { expanded = !expanded }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        plugin.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { expanded = !expanded }
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            plugin.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "ID: ${plugin.id}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            plugin.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    val rotationAngle by animateFloatAsState(
+                        targetValue = if (expanded) 180f else 0f,
+                        label = "rotation"
                     )
-                    Text(
-                        text = "ID: ${plugin.id}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        plugin.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = "Expand",
+                        modifier = Modifier.rotate(rotationAngle)
                     )
                 }
-                Spacer(Modifier.width(16.dp))
-                val rotationAngle by animateFloatAsState(
-                    targetValue = if (expanded) 180f else 0f,
-                    label = "rotation"
-                )
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = "Expand",
-                    modifier = Modifier.rotate(rotationAngle)
-                )
+
+                if (installedVersion != null) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 8.dp, end = 8.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "已安装 v$installedVersion",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
             }
+
 
             AnimatedVisibility(visible = expanded) {
                 Column {
@@ -200,6 +237,7 @@ private fun PluginUpdateCard(
                             pluginId = plugin.id,
                             versionInfo = version,
                             uiState = uiState,
+                            isInstalled = version.version == installedVersion,
                             onDownload = { onDownload(version) }
                         )
                     }
@@ -214,6 +252,7 @@ private fun VersionItem(
     pluginId: String,
     versionInfo: PluginVersionInfo,
     uiState: PluginUpdateState,
+    isInstalled: Boolean,
     onDownload: () -> Unit
 ) {
     val downloadIdentifier = "$pluginId-${versionInfo.version}"
@@ -238,7 +277,9 @@ private fun VersionItem(
             }
         },
         trailingContent = {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.width(80.dp)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier
+                .width(80.dp)
+                .height(40.dp)) {
                 when {
                     downloadProgress != null -> {
                         val animatedProgress by animateFloatAsState(
@@ -264,6 +305,10 @@ private fun VersionItem(
                         }
                     }
 
+                    isInstalled -> {
+                        Text("已安装", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    }
+
                     else -> {
                         Button(onClick = onDownload) {
                             Text("获取")
@@ -275,5 +320,31 @@ private fun VersionItem(
         colors = ListItemDefaults.colors(
             containerColor = Color.Unspecified
         )
+    )
+}
+
+/**
+ * 安装成功后的对话框
+ */
+@Composable
+fun InstallSuccessDialog(
+    pluginName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("更新完成") },
+        text = { Text("插件 '$pluginName' 已热更新。为确保稳定性并避免潜在的内存冲突，建议重启应用。") },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("立即重启")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("暂不重启")
+            }
+        }
     )
 }
