@@ -72,12 +72,12 @@ open class BasePluginActivity : IPluginActivity {
     override fun onKeyDown(
         keyCode: Int,
         event: KeyEvent?,
-    ): Boolean? = null
+    ): Boolean = false
 
     override fun onKeyUp(
         keyCode: Int,
         event: KeyEvent?,
-    ): Boolean? = null
+    ): Boolean = false
 
-    override fun onTouchEvent(event: MotionEvent?): Boolean? = null
+    override fun onTouchEvent(event: MotionEvent?): Boolean = false
 }

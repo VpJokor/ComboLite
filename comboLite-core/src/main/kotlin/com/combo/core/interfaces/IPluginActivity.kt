@@ -96,18 +96,20 @@ interface IPluginActivity {
     fun onKeyDown(
         keyCode: Int,
         event: KeyEvent?,
-    ): Boolean?
+    ): Boolean
 
     /**
      * 处理物理按键抬起事件。
+     * @return true 表示消费事件，false 表示不消费。
      */
     fun onKeyUp(
         keyCode: Int,
         event: KeyEvent?,
-    ): Boolean?
+    ): Boolean
 
     /**
      * 处理触摸事件。通常由Compose手势修饰符处理，仅在需要进行全局触摸拦截时使用。
+     * @return true 表示消费事件，false 表示不消费。
      */
-    fun onTouchEvent(event: MotionEvent?): Boolean?
+    fun onTouchEvent(event: MotionEvent?): Boolean
 }

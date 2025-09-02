@@ -145,16 +145,24 @@ open class BaseHostActivity : ComponentActivity() {
         pluginActivity?.onWindowFocusChanged(hasFocus)
     }
 
-    override fun onKeyDown(
-        keyCode: Int,
-        event: KeyEvent?,
-    ): Boolean = pluginActivity?.onKeyDown(keyCode, event) ?: super.onKeyDown(keyCode, event)
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (pluginActivity?.onKeyDown(keyCode, event) == true) {
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
-    override fun onKeyUp(
-        keyCode: Int,
-        event: KeyEvent?,
-    ): Boolean = pluginActivity?.onKeyUp(keyCode, event) ?: super.onKeyUp(keyCode, event)
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (pluginActivity?.onKeyUp(keyCode, event) == true) {
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
 
-    override fun onTouchEvent(event: MotionEvent?): Boolean =
-        pluginActivity?.onTouchEvent(event) ?: super.onTouchEvent(event)
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        if (pluginActivity?.onTouchEvent(event) == true) {
+            return true
+        }
+        return super.onTouchEvent(event)
+    }
 }

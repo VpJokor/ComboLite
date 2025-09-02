@@ -43,8 +43,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.jf.dexlib2.DexFileFactory
-import org.jf.dexlib2.Opcodes
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
@@ -546,7 +544,8 @@ object PluginManager : IPluginStateProvider {
                     return@withContext null
                 }
 
-                indexPluginClasses(plugin.pluginId, pluginApkFile)
+                loadClassIndexForPlugin(plugin)
+
                 proxyManager.registerStaticReceivers(
                     plugin.pluginId,
                     plugin.staticReceivers.filter { it.enabled })
@@ -662,19 +661,26 @@ object PluginManager : IPluginStateProvider {
         }
     }
 
-    private fun indexPluginClasses(pluginId: String, pluginFile: File) {
-        var indexedCount = 0
+    private fun loadClassIndexForPlugin(plugin: PluginInfo) {
+        val pluginDir = installerManager.getPluginDirectory(plugin.pluginId)
+        val indexFile = File(pluginDir, InstallerManager.CLASS_INDEX_FILENAME)
+        var loadedCount = 0
+
+        if (!indexFile.exists()) {
+            Timber.tag(CLASS_INDEX_TAG).e("类索引文件未找到: ${indexFile.absolutePath}")
+            return
+        }
+
         try {
-            DexFileFactory.loadDexFile(pluginFile, Opcodes.forApi(Build.VERSION.SDK_INT))
-                .classes.forEach { classDef ->
-                    val className = convertDexTypeToClassName(classDef.type)
-                    if (classIndex.putIfAbsent(className, pluginId) == null) {
-                        indexedCount++
-                    }
+            indexFile.forEachLine { className ->
+                if (className.isNotBlank()) {
+                    classIndex[className] = plugin.pluginId
+                    loadedCount++
                 }
-            Timber.tag(CLASS_INDEX_TAG).d("为插件 [$pluginId] 建立 $indexedCount 个类索引。")
+            }
+            Timber.tag(CLASS_INDEX_TAG).d("为插件 [${plugin.pluginId}] 从文件加载了 $loadedCount 个类索引。")
         } catch (e: Exception) {
-            Timber.tag(CLASS_INDEX_TAG).e(e, "为插件 [$pluginId] 建立类索引失败。")
+            Timber.tag(CLASS_INDEX_TAG).e(e, "从文件加载类索引失败: ${indexFile.absolutePath}")
         }
     }
 
@@ -688,15 +694,6 @@ object PluginManager : IPluginStateProvider {
             }
         }
         Timber.tag(CLASS_INDEX_TAG).d("从索引中移除了插件 [$pluginId] 的 $removedCount 个类。")
-    }
-
-
-    private fun convertDexTypeToClassName(dexType: String): String {
-        return if (dexType.startsWith("L") && dexType.endsWith(";")) {
-            dexType.substring(1, dexType.length - 1).replace('/', '.')
-        } else {
-            dexType.replace('/', '.')
-        }
     }
 
     private fun <T : Any> getInterfaceFromHost(interfaceClass: Class<T>, className: String): T? {

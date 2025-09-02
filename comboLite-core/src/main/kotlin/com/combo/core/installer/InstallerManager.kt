@@ -30,11 +30,14 @@ import com.combo.core.security.SignatureValidator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import org.jf.dexlib2.DexFileFactory
+import org.jf.dexlib2.Opcodes
 import org.xmlpull.v1.XmlPullParser
 import timber.log.Timber
 import java.io.File
 import java.io.IOException
 import java.util.zip.ZipFile
+
 
 /**
  * 插件安装器
@@ -62,6 +65,7 @@ class InstallerManager(
         const val PLUGIN_BASE_APK_NAME = "base.apk"
         const val NATIVE_LIBS_DIR_NAME = "lib"
         const val DEX_OPTIMIZED_DIR_NAME = "dex_opt"
+        const val CLASS_INDEX_FILENAME = "class_index"
 
         private const val META_PLUGIN_ID = "plugin.id"
         private const val META_PLUGIN_VERSION = "plugin.version"
@@ -185,9 +189,13 @@ class InstallerManager(
         pluginDir.mkdirs()
 
         try {
-            // 步骤 6: 复制 APK 到插件目录并解压 so 库
+            // 步骤 6: 复制 APK、解压 so 库、创建类索引
             val targetApkFile = copyPluginApk(pluginApkFile, pluginDir)
             extractNativeLibs(pluginApkFile, pluginDir)
+            val indexSuccess = createClassIndex(targetApkFile, pluginDir)
+            if (!indexSuccess) {
+                throw IOException("创建插件类索引失败")
+            }
 
             // 步骤 7: 解析四大组件信息
             val staticReceivers = parseStaticReceivers(targetApkFile.absolutePath)
@@ -312,6 +320,56 @@ class InstallerManager(
             File(File(context.cacheDir, DEX_OPTIMIZED_DIR_NAME), pluginId).apply { mkdirs() }
         } else {
             null
+        }
+    }
+
+    /**
+     * 创建并保存插件的类索引文件，支持多DEX
+     */
+    private fun createClassIndex(pluginApkFile: File, pluginDir: File): Boolean {
+        val indexFile = File(pluginDir, CLASS_INDEX_FILENAME)
+        var indexedCount = 0
+        Timber.tag(TAG).d("开始为插件 [${pluginDir.name}] 创建类索引...")
+
+        try {
+            val dexContainer = DexFileFactory.loadDexContainer(pluginApkFile, Opcodes.forApi(Build.VERSION.SDK_INT))
+            val dexEntryNames = dexContainer.dexEntryNames
+            Timber.tag(TAG).d("在 ${pluginApkFile.name} 中找到 ${dexEntryNames.size} 个 DEX 文件: $dexEntryNames")
+
+            indexFile.bufferedWriter().use { writer ->
+                for (dexEntryName in dexEntryNames) {
+                    // 获取 DexEntry 对象
+                    val dexEntry = dexContainer.getEntry(dexEntryName) ?: continue
+
+                    // 从 DexEntry 获取 DexFile
+                    val dexFile = dexEntry.dexFile
+
+                    // 遍历 DexFile 中的所有类
+                    dexFile.classes.forEach { classDef ->
+                        val className = convertDexTypeToClassName(classDef.type)
+                        writer.write(className)
+                        writer.newLine()
+                        indexedCount++
+                    }
+                }
+            }
+            Timber.tag(TAG).i("为插件 [${pluginDir.name}] 成功创建类索引，共 $indexedCount 个类，文件: ${indexFile.absolutePath}")
+            return true
+        } catch (e: Exception) {
+            Timber.tag(TAG).e(e, "创建类索引文件失败: ${pluginApkFile.name}")
+            indexFile.delete()
+            return false
+        }
+    }
+
+    /**
+     * 辅助函数，用于将 DexFile 中的类型描述符转换为标准的 Java 类名。
+     */
+    private fun convertDexTypeToClassName(dexType: String): String {
+        return if (dexType.startsWith("L") && dexType.endsWith(";")) {
+            dexType.substring(1, dexType.length - 1).replace('/', '.')
+        } else {
+            dexType.replace('/', '.')
         }
     }
 
