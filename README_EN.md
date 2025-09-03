@@ -297,14 +297,14 @@ dependencies {
 With the environment set up, we highly recommend reading the following documents to begin your
 plugin development journey:
 
-* **[[Must Read] Quick Start](https://www.google.com/search?q=./docs/1_QUICK_START.md)**: Build and
+* **[[Must Read] Quick Start](./docs/1_QUICK_START_EN.md)**: Build and
   run your first plugin from scratch.
-* **[[Core] Packaging Guide](https://www.google.com/search?q=./docs/2_PACKAGING_GUIDE.md)**: Dive
+* **[[Core] Packaging Guide](./docs/2_PACKAGING_GUIDE_EN.md)**: Dive
   deep into the `aar2apk` plugin and master both packaging strategies.
-* **[[Advanced] Core API Usage](https://www.google.com/search?q=./docs/3_CORE_APIS.md)**: Master all
+* **[[Advanced] Core API Usage](./docs/3_CORE_APIS_EN.md)**: Master all
   the core functions of `PluginManager`.
-* **[[Advanced] Four Components Guide](https://www.google.com/search?q=./docs/4_COMPONENTS_GUIDE.md)**: Learn how to use Activity, Service, BroadcastReceiver, and ContentProvider within plugins.
-* **[[Principles] Architecture & Design](https://www.google.com/search?q=./docs/5_ARCHITECTURE.md)**: Explore the internal workings of ComboLite.
+* **[[Advanced] Four Components Guide](./docs/4_COMPONENTS_GUIDE_EN.md)**: Learn how to use Activity, Service, BroadcastReceiver, and ContentProvider within plugins.
+* **[[Principles] Architecture & Design](./docs/5_ARCHITECTURE_EN.md)**: Explore the internal workings of ComboLite.
 
 -----
 

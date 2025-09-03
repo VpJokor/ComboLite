@@ -152,7 +152,7 @@ At this point, the basic configuration for the host is complete!
 > If you need to use more advanced plugin features like Service, BroadcastReceiver, or
 > ContentProvider, you will need to configure proxies and a proxy pool in your `Application` and
 `AndroidManifest`. These are advanced, optional features that will be detailed in the *
-*[[Advanced] Four Components Guide](./4_COMPONENTS_GUIDE_en.md)**.
+*[[Advanced] Four Components Guide](4_COMPONENTS_GUIDE_EN.md)**.
 
 -----
 
@@ -600,11 +600,11 @@ quick-start sample code we have prepared for you.
 Now that you've mastered the basics, it's time to dive deeper into `ComboLite`'s more powerful
 features:
 
-* **[[Core] Packaging Guide](./2_PACKAGING_GUIDE_en.md)**: Learn how to properly package your plugin
+* **[[Core] Packaging Guide](2_PACKAGING_GUIDE_EN.md)**: Learn how to properly package your plugin
   modules into APKs.
-* **[[Advanced] Core API Usage](./3_CORE_APIS_en.md)**: Master the rich interface provided by
+* **[[Advanced] Core API Usage](3_CORE_APIS_EN.md)**: Master the rich interface provided by
   `PluginManager`.
-* **[[Advanced] Four Components Guide](./4_COMPONENTS_GUIDE_en.md)**: Give your plugins the power of
+* **[[Advanced] Four Components Guide](4_COMPONENTS_GUIDE_EN.md)**: Give your plugins the power of
   Activity, Service, and more.
-* **[[Principles] Architecture & Design](./5_ARCHITECTURE_en.md)**: Delve into the magic behind how
+* **[[Principles] Architecture & Design](5_ARCHITECTURE_EN.md)**: Delve into the magic behind how
   `ComboLite` works.

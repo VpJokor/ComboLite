@@ -310,4 +310,4 @@ complexity of your packaging.
 > **We strongly recommend you prioritize using Jetpack Compose in your plugins**.
 > For an in-depth discussion of the specific problems you might encounter with XML and their
 > solutions, please refer to the "UI Implementation Technology Choice" section in the *
-*[[Advanced] Four Components Guide](./4_COMPONENTS_GUIDE_en.md)**.
+*[[Advanced] Four Components Guide](4_COMPONENTS_GUIDE_EN.md)**.
