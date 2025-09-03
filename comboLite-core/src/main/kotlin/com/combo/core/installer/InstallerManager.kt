@@ -661,32 +661,70 @@ class InstallerManager(
     }
 
     /**
-     * 比较两个版本号字符串。
-     * 支持 "1.0.0" 格式的版本号。
+     * 比较两个版本号字符串
+     * 支持语义化版本（SemVer 2.0.0）规范
+     * 能够精确处理主版本号、预发布标签（如 "1.0.0-rc.10"）以及它们的组合。
      *
      * @param version1 第一个版本号。
      * @param version2 第二个版本号。
      * @return 如果 version1 > version2 返回正数, version1 < version2 返回负数, 相等则返回 0。
      */
     private fun compareVersions(version1: String, version2: String): Int {
-        return try {
-            val parts1 = version1.split('.').map { it.toIntOrNull() ?: 0 }
-            val parts2 = version2.split('.').map { it.toIntOrNull() ?: 0 }
-            val maxLength = maxOf(parts1.size, parts2.size)
+        try {
+            val parts1 = version1.split('-', limit = 2)
+            val parts2 = version2.split('-', limit = 2)
+            val mainVersion1 = parts1[0]
+            val mainVersion2 = parts2[0]
+            val preRelease1 = if (parts1.size > 1) parts1[1] else null
+            val preRelease2 = if (parts2.size > 1) parts2[1] else null
+
+            val mainParts1 = mainVersion1.split('.').map { it.toInt() }
+            val mainParts2 = mainVersion2.split('.').map { it.toInt() }
+            val maxLength = maxOf(mainParts1.size, mainParts2.size)
 
             for (i in 0 until maxLength) {
-                val v1 = parts1.getOrNull(i) ?: 0
-                val v2 = parts2.getOrNull(i) ?: 0
-                if (v1 != v2) {
-                    return v1.compareTo(v2)
+                val num1 = mainParts1.getOrNull(i) ?: 0
+                val num2 = mainParts2.getOrNull(i) ?: 0
+                if (num1 != num2) {
+                    return num1.compareTo(num2)
                 }
             }
-            0
-        } catch (e: Exception) {
+
+            when {
+                preRelease1 == null && preRelease2 == null -> return 0
+                preRelease1 != null && preRelease2 == null -> return -1
+                preRelease1 == null && preRelease2 != null -> return 1
+            }
+
+            val identifiers1 = preRelease1!!.split('.')
+            val identifiers2 = preRelease2!!.split('.')
+            val minIdLength = minOf(identifiers1.size, identifiers2.size)
+
+            for (i in 0 until minIdLength) {
+                val id1 = identifiers1[i]
+                val id2 = identifiers2[i]
+
+                if (id1 == id2) continue
+
+                val num1 = id1.toIntOrNull()
+                val num2 = id2.toIntOrNull()
+
+                return when {
+                    num1 != null && num2 != null -> num1.compareTo(num2)
+                    num1 != null -> -1
+                    num2 != null -> 1
+                    else -> id1.compareTo(id2)
+                }
+            }
+
+            return identifiers1.size.compareTo(identifiers2.size)
+
+        } catch (e: NumberFormatException) {
             Timber.tag(TAG).w(e, "版本号解析失败，回退到字符串比较: $version1 vs $version2")
-            version1.compareTo(version2)
+            return version1.compareTo(version2)
         }
     }
+
 
     /**
      * 清理指定插件的 DEX 优化缓存目录。
