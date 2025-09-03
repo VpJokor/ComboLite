@@ -270,4 +270,4 @@ android {
 
 > **我们强烈建议您在插件中优先使用 Jetpack Compose**。
 > 关于使用 XML 可能遇到的具体问题及其解决方案的深入探讨，请参阅 *
-*[[四大组件指南](./4_COMPONENTS_GUIDE.md)](./4_COMPONENTS_GUIDE.md) 中的“UI 实现技术选型”章节**。
+*[[四大组件指南](./4_COMPONENTS_GUIDE.md)](4_COMPONENTS_GUIDE_ZH.md) 中的“UI 实现技术选型”章节**。

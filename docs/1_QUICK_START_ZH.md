@@ -246,7 +246,7 @@ class MyPluginEntry : IPluginEntryClass {
 ### 3.1 准备插件 APK
 
 至此，你的第一个插件已经开发完成！接下来，你需要将这个插件模块打包成一个 APK 文件。打包的具体方法和高级策略，我们将在
-**[[核心] 插件打包指南](./2_PACKAGING_GUIDE.md)** 中详细介绍。
+**[[核心] 插件打包指南](2_PACKAGING_GUIDE_ZH.md)** 中详细介绍。
 
 **在本指南中，我们假设你已经通过打包插件得到了一个名为 `my-plugin-release.apk` 的文件。**
 
