@@ -19,7 +19,7 @@ package com.combo.plugin.sample.example.activity
 import android.os.Bundle
 import android.widget.SeekBar
 import android.widget.Toast
-import com.combo.core.base.BasePluginActivity
+import com.combo.core.component.activity.BasePluginActivity
 import com.combo.plugin.sample.example.databinding.ActivityXmlBinding
 
 class XmlActivity : BasePluginActivity() {

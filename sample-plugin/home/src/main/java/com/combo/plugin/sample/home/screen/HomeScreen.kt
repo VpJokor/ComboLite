@@ -46,7 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.combo.core.manager.PluginManager
+import com.combo.core.runtime.PluginManager
 import com.combo.plugin.sample.common.component.EmptyPage
 import com.combo.plugin.sample.home.state.PluginStatus
 import com.combo.plugin.sample.home.viewmodel.HomeViewModel

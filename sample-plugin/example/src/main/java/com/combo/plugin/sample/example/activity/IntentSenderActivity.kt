@@ -47,8 +47,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.combo.core.base.BasePluginActivity
-import com.combo.core.ext.startPluginActivity
+import com.combo.core.component.activity.BasePluginActivity
+import com.combo.core.utils.startPluginActivity
 
 class IntentSenderActivity : BasePluginActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

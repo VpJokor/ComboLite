@@ -17,8 +17,8 @@
 package com.combo.plugin.sample.home.viewmodel
 
 import androidx.lifecycle.viewModelScope
-import com.combo.core.installer.InstallerManager
-import com.combo.core.manager.PluginManager
+import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.installer.InstallerManager
 import com.combo.plugin.sample.common.update.DownloadStatus
 import com.combo.plugin.sample.common.update.UpdateManager
 import com.combo.plugin.sample.common.viewmodel.BaseViewModel

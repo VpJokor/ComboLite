@@ -60,8 +60,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.combo.core.manager.PluginManager
 import com.combo.core.model.PluginInfo
+import com.combo.core.runtime.PluginManager
 
 /**
  * 单个插件的管理卡片

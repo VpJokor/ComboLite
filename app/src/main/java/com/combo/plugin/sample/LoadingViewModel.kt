@@ -20,8 +20,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.combo.core.interfaces.IPluginEntryClass
-import com.combo.core.manager.PluginManager
+import com.combo.core.api.IPluginEntryClass
+import com.combo.core.runtime.PluginManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

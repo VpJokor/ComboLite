@@ -38,7 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.combo.core.base.BasePluginActivity
+import com.combo.core.component.activity.BasePluginActivity
 import com.combo.plugin.sample.common.R
 
 class ComposeActivity : BasePluginActivity() {

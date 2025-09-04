@@ -17,11 +17,11 @@
 package com.combo.plugin.sample.guide
 
 import androidx.compose.runtime.Composable
-import com.combo.core.interfaces.IPluginEntryClass
+import com.combo.core.api.IPluginEntryClass
 import com.combo.core.model.PluginContext
 import org.koin.core.module.Module
 
-class PluginEntryClass : IPluginEntryClass {
+object PluginEntryClass : IPluginEntryClass {
     override val pluginModule: List<Module>
         get() = emptyList()
 

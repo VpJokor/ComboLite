@@ -16,7 +16,7 @@
 
 package com.combo.plugin.sample
 
-import com.combo.core.base.BaseHostService
+import com.combo.core.component.service.BaseHostService
 
 class HostService1 : BaseHostService()
 

@@ -18,7 +18,7 @@ package com.combo.plugin.sample.home
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import com.combo.core.interfaces.IPluginEntryClass
+import com.combo.core.api.IPluginEntryClass
 import com.combo.core.model.PluginContext
 import com.combo.plugin.sample.common.navigation.IHubComposeNavigator
 import com.combo.plugin.sample.common.navigation.LocalComposeNavigator
@@ -35,7 +35,7 @@ import org.koin.java.KoinJavaComponent.inject
  * @author IHUB Plugin Framework
  * @since 2.0.0
  */
-class PluginEntryClass : IPluginEntryClass {
+object PluginEntryClass : IPluginEntryClass {
     override val pluginModule: List<Module>
         get() =
             listOf(

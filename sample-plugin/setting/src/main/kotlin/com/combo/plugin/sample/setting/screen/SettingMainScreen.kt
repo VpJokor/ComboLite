@@ -41,7 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
-import com.combo.core.manager.PluginManager
+import com.combo.core.runtime.PluginManager
 import com.combo.plugin.sample.setting.component.InfoCard
 import com.combo.plugin.sample.setting.component.PluginCard
 import com.combo.plugin.sample.setting.viewmodel.SettingViewModel

@@ -20,7 +20,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.widget.Toast
 import androidx.lifecycle.viewModelScope
-import com.combo.core.manager.PluginManager
+import com.combo.core.runtime.PluginManager
 import com.combo.plugin.sample.common.viewmodel.BaseViewModel
 import com.combo.plugin.sample.setting.state.SettingState
 import kotlinx.coroutines.delay

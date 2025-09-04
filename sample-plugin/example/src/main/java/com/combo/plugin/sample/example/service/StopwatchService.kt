@@ -29,8 +29,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
-import com.combo.core.base.BasePluginService
-import com.combo.core.ext.sendInternalBroadcast
+import com.combo.core.component.service.BasePluginService
+import com.combo.core.utils.sendInternalBroadcast
 import com.combo.plugin.sample.example.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

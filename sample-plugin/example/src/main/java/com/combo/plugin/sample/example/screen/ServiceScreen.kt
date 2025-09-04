@@ -66,10 +66,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.combo.core.ext.bindPluginService
-import com.combo.core.ext.startPluginService
-import com.combo.core.ext.stopPluginService
-import com.combo.core.manager.PluginManager
+import com.combo.core.runtime.PluginManager
+import com.combo.core.utils.bindPluginService
+import com.combo.core.utils.startPluginService
+import com.combo.core.utils.stopPluginService
 import com.combo.plugin.sample.example.service.StopwatchService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -16,9 +16,9 @@
 
 package com.combo.plugin.sample.home.state
 
-import com.combo.core.interfaces.IPluginEntryClass
-import com.combo.core.manager.PluginManager
+import com.combo.core.api.IPluginEntryClass
 import com.combo.core.model.PluginInfo
+import com.combo.core.runtime.PluginManager
 import com.combo.plugin.sample.common.viewmodel.BaseUiState
 
 /**

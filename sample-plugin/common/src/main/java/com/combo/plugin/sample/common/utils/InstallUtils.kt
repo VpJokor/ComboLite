@@ -15,8 +15,8 @@
  */
 
 import android.content.Context
-import com.combo.core.installer.InstallerManager
-import com.combo.core.manager.PluginManager
+import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.installer.InstallerManager
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException

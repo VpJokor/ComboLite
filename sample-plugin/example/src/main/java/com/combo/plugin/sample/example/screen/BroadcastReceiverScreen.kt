@@ -70,7 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.combo.core.ext.sendInternalBroadcast
+import com.combo.core.utils.sendInternalBroadcast
 import com.combo.plugin.sample.example.receiver.BroadcastLog
 import kotlinx.coroutines.launch
 

@@ -16,11 +16,11 @@
 
 package com.combo.plugin.sample
 
-import com.combo.core.base.BaseHostApplication
-import com.combo.core.manager.PluginManager
-import com.combo.core.security.IPluginCrashCallback
-import com.combo.core.security.PluginCrashHandler
-import com.combo.core.security.PluginCrashInfo
+import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.app.BaseHostApplication
+import com.combo.core.security.crash.IPluginCrashCallback
+import com.combo.core.security.crash.PluginCrashHandler
+import com.combo.core.security.crash.PluginCrashInfo
 import org.koin.core.context.loadKoinModules
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -35,6 +35,21 @@ class HostApp : BaseHostApplication(),IPluginCrashCallback {
         super.onCreate()
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
+            loadKoinModules(
+                com.combo.plugin.sample.home.PluginEntryClass.pluginModule
+            )
+            loadKoinModules(
+                com.combo.plugin.sample.common.PluginEntryClass.pluginModule
+            )
+            loadKoinModules(
+                com.combo.plugin.sample.guide.PluginEntryClass.pluginModule
+            )
+            loadKoinModules(
+                com.combo.plugin.sample.setting.PluginEntryClass.pluginModule
+            )
+            loadKoinModules(
+                com.combo.plugin.sample.example.PluginEntryClass.pluginModule
+            )
         }
 
         // 配置Activity代理

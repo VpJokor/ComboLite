@@ -23,7 +23,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
-import com.combo.core.interfaces.IPluginReceiver
+import com.combo.core.api.IPluginReceiver
 import com.combo.plugin.sample.common.R
 import com.combo.plugin.sample.example.receiver.NotificationUtil.BOOT_CHANNEL_ID
 import com.combo.plugin.sample.example.receiver.NotificationUtil.BOOT_NOTIFICATION_ID

@@ -110,4 +110,11 @@ dependencies {
     // 插件核心库 本地依赖方式
     implementation(projects.comboLiteCore)
     implementation(projects.dependencies)
+
+    // 插件库方便快速Debug
+    debugImplementation(projects.samplePlugin.common)
+    debugImplementation(projects.samplePlugin.home)
+    debugImplementation(projects.samplePlugin.guide)
+    debugImplementation(projects.samplePlugin.example)
+    debugImplementation(projects.samplePlugin.setting)
 }

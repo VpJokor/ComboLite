@@ -17,14 +17,14 @@
 package com.combo.plugin.sample.example
 
 import androidx.compose.runtime.Composable
-import com.combo.core.interfaces.IPluginEntryClass
+import com.combo.core.api.IPluginEntryClass
 import com.combo.core.model.PluginContext
 import com.combo.plugin.sample.example.di.diModule
 import com.combo.plugin.sample.example.receiver.NotificationUtil
 import com.combo.plugin.sample.example.screen.ExampleMainScreen
 import org.koin.core.module.Module
 
-class PluginEntryClass : IPluginEntryClass {
+object PluginEntryClass : IPluginEntryClass {
     override val pluginModule: List<Module>
         get() = listOf(
             diModule
