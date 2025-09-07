@@ -73,7 +73,6 @@ android {
                         listOf(
                             "DebugProbesKt.bin",
                             "kotlin-tooling-metadata.json",
-                            "kotlin/**",
                         )
                 }
             }
@@ -112,9 +111,9 @@ dependencies {
     implementation(projects.dependencies)
 
     // 插件库方便快速Debug
-    debugImplementation(projects.samplePlugin.common)
-    debugImplementation(projects.samplePlugin.home)
-    debugImplementation(projects.samplePlugin.guide)
-    debugImplementation(projects.samplePlugin.example)
-    debugImplementation(projects.samplePlugin.setting)
+//    debugImplementation(projects.samplePlugin.common)
+//    debugImplementation(projects.samplePlugin.home)
+//    debugImplementation(projects.samplePlugin.guide)
+//    debugImplementation(projects.samplePlugin.example)
+//    debugImplementation(projects.samplePlugin.setting)
 }

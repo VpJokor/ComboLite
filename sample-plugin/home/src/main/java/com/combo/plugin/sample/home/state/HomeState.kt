@@ -17,8 +17,8 @@
 package com.combo.plugin.sample.home.state
 
 import com.combo.core.api.IPluginEntryClass
+import com.combo.core.model.LoadedPluginInfo
 import com.combo.core.model.PluginInfo
-import com.combo.core.runtime.PluginManager
 import com.combo.plugin.sample.common.viewmodel.BaseUiState
 
 /**
@@ -36,7 +36,7 @@ enum class PluginStatus {
 }
 
 data class HomeState(
-    var plugins: Map<String, PluginManager.LoadedPluginInfo> = emptyMap(),
+    var plugins: Map<String, LoadedPluginInfo> = emptyMap(),
     var pluginEntryClasses: Map<String, IPluginEntryClass> = emptyMap(),
     var installedPlugins: List<PluginInfo> = emptyList(),
     val guideEntryClass: IPluginEntryClass? = null,

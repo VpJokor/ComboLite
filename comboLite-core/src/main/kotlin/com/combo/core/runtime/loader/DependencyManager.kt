@@ -16,7 +16,7 @@
 
 package com.combo.core.runtime.loader
 
-import com.combo.core.runtime.PluginManager
+import com.combo.core.model.LoadedPluginInfo
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 
@@ -200,5 +200,5 @@ internal class DependencyManager(
  */
 internal interface IPluginStateProvider {
     fun getClassIndex(): Map<String, String>
-    fun getLoadedPlugins(): Map<String, PluginManager.LoadedPluginInfo>
+    fun getLoadedPlugins(): Map<String, LoadedPluginInfo>
 }

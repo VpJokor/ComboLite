@@ -23,7 +23,7 @@ import com.combo.plugin.sample.setting.di.diModule
 import com.combo.plugin.sample.setting.screen.SettingMainScreen
 import org.koin.core.module.Module
 
-object PluginEntryClass : IPluginEntryClass {
+class PluginEntryClass : IPluginEntryClass {
     override val pluginModule: List<Module>
         get() = listOf(
             diModule

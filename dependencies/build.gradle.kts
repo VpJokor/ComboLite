@@ -91,4 +91,5 @@ dependencies {
 
     // ========== 其他常用库 ==========
     api(libs.androidx.foundation.android)
+    api(libs.kotlin.reflect)
 }

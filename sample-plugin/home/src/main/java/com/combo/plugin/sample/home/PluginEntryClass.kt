@@ -35,7 +35,7 @@ import org.koin.java.KoinJavaComponent.inject
  * @author IHUB Plugin Framework
  * @since 2.0.0
  */
-object PluginEntryClass : IPluginEntryClass {
+class PluginEntryClass : IPluginEntryClass {
     override val pluginModule: List<Module>
         get() =
             listOf(

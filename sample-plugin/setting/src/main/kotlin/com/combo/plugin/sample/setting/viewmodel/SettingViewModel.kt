@@ -51,12 +51,12 @@ class SettingViewModel(
         }
     }
 
-    fun setPluginEnabled(pluginId: String, enabled: Boolean) {
+    fun setPluginEnabled(pluginId: String, enabled: Boolean) = viewModelScope.launch {
         PluginManager.setPluginEnabled(pluginId, enabled)
         updateInstalledPlugins()
     }
 
-    fun uninstallPlugin(pluginId: String) {
+    fun uninstallPlugin(pluginId: String) = viewModelScope.launch {
         val result = PluginManager.installerManager.uninstallPlugin(pluginId)
         if (result) {
             Toast.makeText(

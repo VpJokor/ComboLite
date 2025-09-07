@@ -20,9 +20,14 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
 import android.os.Process
+import android.os.Process.killProcess
 import com.combo.core.exception.PluginDependencyException
+import com.combo.core.model.PluginCrashInfo
 import com.combo.core.runtime.PluginManager
 import com.combo.core.utils.startPluginActivity
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import kotlin.system.exitProcess
 
@@ -171,12 +176,14 @@ class PluginCrashHandler private constructor(
      * 默认处理方式 A：禁用肇事插件，并提示用户
      */
     private fun handlePluginExceptionByDefault(info: PluginCrashInfo) {
-        Timber.e(info.throwable, "默认处理：将禁用插件 [${info.culpritPluginId}]")
-        info.culpritPluginId?.let { PluginManager.setPluginEnabled(it, false) }
+        CoroutineScope(Dispatchers.Main).launch {
+            Timber.e(info.throwable, "默认处理：将禁用插件 [${info.culpritPluginId}]")
+            info.culpritPluginId?.let { PluginManager.setPluginEnabled(it, false) }
 
-        val message = "${info.defaultMessage}\n该模块已被临时禁用，重启应用后即可恢复其他功能。"
-        showCrashActivity(message)
-        killProcess()
+            val message = "${info.defaultMessage}\n该模块已被临时禁用，重启应用后即可恢复其他功能。"
+            showCrashActivity(message)
+            killProcess()
+        }
     }
 
     /**
@@ -200,7 +207,7 @@ class PluginCrashHandler private constructor(
     }
 
     private fun killProcess() {
-        Process.killProcess(Process.myPid())
+        killProcess(Process.myPid())
         exitProcess(10)
     }
 

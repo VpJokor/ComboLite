@@ -24,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import com.combo.core.component.activity.BaseHostActivity
 import com.combo.core.runtime.PluginManager
-import com.combo.plugin.sample.home.PluginEntryClass
 
 class HostActivity : BaseHostActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -32,14 +31,15 @@ class HostActivity : BaseHostActivity() {
         if (super.pluginActivity == null) {
             enableEdgeToEdge()
             setContent {
-                if (BuildConfig.DEBUG) {
-                    PluginEntryClass.Content()
-                } else {
-                    val resources by PluginManager.resourcesManager.mResourcesFlow.collectAsState()
-                    key(resources) {
-                        LoadingScreen()
-                    }
+//                if (BuildConfig.DEBUG) {
+//
+//                } else {
+                val resources by PluginManager.resourcesManager.mResourcesFlow.collectAsState()
+                key(resources) {
+                    LoadingScreen()
                 }
+//                }
+
             }
         }
     }

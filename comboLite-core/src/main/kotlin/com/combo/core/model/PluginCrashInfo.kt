@@ -14,25 +14,17 @@
  * limitations under the License.
  */
 
-package com.combo.plugin.sample.guide
+package com.combo.core.model
 
-import androidx.compose.runtime.Composable
-import com.combo.core.api.IPluginEntryClass
-import com.combo.core.model.PluginContext
-import org.koin.core.module.Module
-
-class PluginEntryClass : IPluginEntryClass {
-    override val pluginModule: List<Module>
-        get() = emptyList()
-
-    @Composable
-    override fun Content() {
-        GuideMainScreen()
-    }
-
-    override fun onLoad(context: PluginContext) {
-    }
-
-    override fun onUnload() {
-    }
-}
+/**
+ * 封装了插件崩溃的详细信息。
+ *
+ * @param throwable 捕获到的原始异常。
+ * @param culpritPluginId 引发崩溃的插件ID。如果无法确定，则为 null。
+ * @param defaultMessage 框架根据异常类型生成的默认提示信息。
+ */
+data class PluginCrashInfo(
+    val throwable: Throwable,
+    val culpritPluginId: String?,
+    val defaultMessage: String
+)

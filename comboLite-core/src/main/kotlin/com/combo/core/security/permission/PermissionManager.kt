@@ -17,94 +17,91 @@
 package com.combo.core.security.permission
 
 import android.app.Application
-import com.combo.core.model.PluginInfo
-import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.PluginManager.getPluginInfo
+import com.combo.core.security.permission.PermissionLevel.HOST
+import com.combo.core.security.permission.PermissionLevel.SELF
 import com.combo.core.security.signature.SignatureValidator
 import timber.log.Timber
 
 /**
- * 插件权限管理器
+ * 定义了插件调用敏感 API 所需的权限等级。
  *
- * 负责校验插件是否有权限执行敏感操作。
- * 它是框架安全体系的核心，所有对敏感API的调用都必须先通过此管理器的检查。
- *
- * @property context Application 上下文
+ * 权限等级：
+ * - [HOST]：表示插件需要宿主签名才能调用的敏感 API。
+ * - [SELF]：表示插件需要与目标插件 ID 相同才能调用的敏感 API。
  */
-class PermissionManager(private val context: Application) {
+enum class PermissionLevel {
+    HOST,
+    SELF,
+}
 
-    // 宿主签名摘要的懒加载缓存
+/**
+ * 定义了插件权限检查的结果。
+ */
+enum class PermissionResult {
+    GRANTED,
+    DENIED,
+    NEEDS_USER_CONSENT
+}
+
+
+/**
+ * 静态权限检查器
+ *
+ * 负责根据预设规则（如签名、调用者ID）进行无UI的权限检查。
+ * 它不关心用户授权，只返回检查结果。
+ */
+internal class PermissionManager(private val context: Application) {
+    // 懒加载并缓存宿主签名摘要
     private val hostSignatureDigests: Set<String> by lazy {
         SignatureValidator.getHostSignatures(context).also {
             if (it.isEmpty()) {
-                throw IllegalStateException("无法获取宿主签名，权限系统初始化失败。")
+                Timber.e("无法获取宿主签名，权限系统可能无法正常工作。")
             }
         }
     }
 
     /**
-     * 核心权限检查方法。
+     * 检查API调用的静态权限。
      *
      * @param callingPluginId 发起调用的插件ID。
-     * @param requiredLevel 此操作所要求的最低权限等级。
-     * @param targetPluginId (可选) 操作的目标插件ID，用于 SELF 权限检查。
-     * @return `true` 如果权限检查通过，否则 `false`。
+     * @param requiredLevel 要求的权限等级。
+     * @param targetPluginId （可选）操作的目标插件ID。
+     * @return `true` 如果静态检查通过，否则 `false`。
      */
-    fun checkPermission(
+    fun checkApiPermission(
         callingPluginId: String,
         requiredLevel: PermissionLevel,
         targetPluginId: String? = null
     ): Boolean {
-        Timber.d("权限检查: 调用方[$callingPluginId], 要求[$requiredLevel], 目标[$targetPluginId]")
+        val callingPluginInfo = getPluginInfo(callingPluginId)?.pluginInfo
+            ?: return false
 
-        // 获取调用方插件的信息
-        val callingPluginInfo = PluginManager.getPluginInfo(callingPluginId)?.pluginInfo
-        if (callingPluginInfo == null) {
-            Timber.e("权限拒绝: 无法找到调用方插件信息 [$callingPluginId]")
-            return false
-        }
-
-        // 根据要求的权限等级进行检查
         return when (requiredLevel) {
-            PermissionLevel.NONE -> true // 无需权限，直接通过
-            PermissionLevel.SELF -> {
-                if (targetPluginId == null) {
-                    Timber.w("权限检查警告: SELF 权限需要明确的 targetPluginId")
-                    false
-                } else {
-                    callingPluginId == targetPluginId
-                }
-            }
-            PermissionLevel.HOST -> hasHostSignature(callingPluginInfo)
-            PermissionLevel.SIGNATURE -> hasSignature(callingPluginInfo) // 调用新增的检查
-            PermissionLevel.USER_GRANTABLE -> {
-                // USER_GRANTABLE 逻辑比较特殊，不在此处直接检查。
-                // 而是由调用方（如PluginManager）捕获此等级，然后触发UI回调。
-                // 如果宿主未实现回调或用户拒绝，则操作失败。
-                true // 此处返回true，表示检查已委托给上层处理
-            }
+            PermissionLevel.HOST -> hasHostSignature(callingPluginInfo.path)
+            PermissionLevel.SELF -> callingPluginId == targetPluginId
         }
     }
 
     /**
-     * 检查插件签名是否与宿主完全一致。
-     * 规则：插件的签名集合必须是宿主签名集合的子集。
+     * 检查插件安装的静态权限。
+     * 在严格模式下，只检查签名是否与宿主一致。
+     *
+     * @param pluginSignature 待安装插件的签名摘要。
+     * @return `true` 如果签名匹配，否则 `false`。
      */
-    private fun hasHostSignature(pluginInfo: PluginInfo): Boolean {
-        val pluginSignatureDigests = SignatureValidator.getPluginSignatures(context, pluginInfo.path)
+    fun checkInstallPermission(pluginSignature: String): Boolean {
+        return hostSignatureDigests.contains(pluginSignature)
+    }
+
+    /**
+     * 检查指定路径的APK签名是否与宿主完全一致。
+     */
+    private fun hasHostSignature(apkPath: String): Boolean {
+        val pluginSignatureDigests = SignatureValidator.getPluginSignatures(context, apkPath)
         if (pluginSignatureDigests.isEmpty()) {
-            Timber.w("无法获取插件 [${pluginInfo.pluginId}] 的签名，权限检查失败。")
             return false
         }
         return hostSignatureDigests.containsAll(pluginSignatureDigests)
-    }
-
-    /**
-     * 检查插件签名是否与宿主签名链匹配（更宽松）。
-     * 在当前实现中，此逻辑等同于 `hasHostSignature`。
-     * 未来可扩展为更复杂的逻辑，例如校验签名链中的根证书等。
-     */
-    private fun hasSignature(pluginInfo: PluginInfo): Boolean {
-        // 简化处理，可扩展
-        return hasHostSignature(pluginInfo)
     }
 }

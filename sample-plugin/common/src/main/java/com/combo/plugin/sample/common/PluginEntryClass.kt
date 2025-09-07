@@ -25,7 +25,7 @@ import com.combo.plugin.sample.common.update.net.RetrofitClient
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
-object PluginEntryClass : IPluginEntryClass {
+class PluginEntryClass : IPluginEntryClass {
     override val pluginModule: List<Module>
         get() =
             listOf(

@@ -32,7 +32,7 @@ import java.security.MessageDigest
  * 一个单例工具对象，提供获取和校验应用/插件APK签名的核心功能。
  * 内部处理了新旧Android版本的API兼容性，并对宿主签名信息进行缓存以提高性能。
  */
-object SignatureValidator {
+internal object SignatureValidator {
 
     private const val TAG = "SignatureValidator"
 
@@ -139,7 +139,6 @@ object SignatureValidator {
 
     /**
      * 获取签名信息的核心实现，适配新旧API。
-     * (源自您提供的优秀实现)
      *
      * @param context 上下文
      * @param source  包名或APK文件路径
@@ -177,8 +176,6 @@ object SignatureValidator {
 
             val signatures: Set<Signature>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val signingInfo = packageInfo.signingInfo ?: return null
-                // hasMultipleSigners() 表示 APK 使用了 v3 签名方案并且有多个签名者。
-                // signingCertificateHistory 表示 APK 使用了 v2 或 v3 签名方案，即使只有一个签名者。
                 if (signingInfo.hasMultipleSigners()) {
                     signingInfo.apkContentsSigners.toSet()
                 } else {

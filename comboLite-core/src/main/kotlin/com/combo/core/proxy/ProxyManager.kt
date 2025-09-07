@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.combo.core.component.proxy
+package com.combo.core.proxy
 
 import android.app.Application
 import android.content.ContentProvider

@@ -68,12 +68,19 @@ dependencies {
     // 序列化支持
     implementation(libs.kotlinx.serialization.json)
 
+    // Kotlin反射库
+    implementation(libs.kotlin.reflect)
+
     // Koin依赖注入（用于插件模块管理）
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
 
     // Dex lib2 库
     implementation(libs.dexlib2)
+
+    implementation(libs.coil.kt)
+    implementation(libs.coil.okhttp)
+    implementation(libs.coil.kt.compose)
 }
 
 mavenPublishing {

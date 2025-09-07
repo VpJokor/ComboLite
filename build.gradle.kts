@@ -39,9 +39,9 @@ aar2apk {
 
     // 配置签名信息
     signing {
-        keystorePath.set(rootProject.file("jctech.jks").absolutePath)
-        keystorePassword.set("he1755858138")
-        keyAlias.set("jctech")
-        keyPassword.set("he1755858138")
+        keystorePath.set(rootProject.file("test.jks").absolutePath)
+        keystorePassword.set("12345678")
+        keyAlias.set("test")
+        keyPassword.set("12345678")
     }
 }

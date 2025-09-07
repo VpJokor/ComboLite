@@ -21,14 +21,18 @@ import android.content.pm.PackageManager
 import android.content.res.AssetManager
 import android.content.res.XmlResourceParser
 import android.os.Build
+import com.combo.core.model.AuthorizationRequest
 import com.combo.core.model.IntentFilterInfo
 import com.combo.core.model.MetaDataInfo
 import com.combo.core.model.PluginInfo
 import com.combo.core.model.ProviderInfo
 import com.combo.core.model.StaticReceiverInfo
 import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.ValidationStrategy
+import com.combo.core.security.permission.PermissionLevel
+import com.combo.core.security.permission.RequiresPermission
+import com.combo.core.security.permission.checkApiCaller
 import com.combo.core.security.signature.SignatureValidator
-import com.combo.core.security.signature.ValidationStrategy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -39,6 +43,7 @@ import timber.log.Timber
 import java.io.File
 import java.io.IOException
 import java.util.zip.ZipFile
+import kotlin.reflect.jvm.javaMethod
 
 
 /**
@@ -51,7 +56,6 @@ class InstallerManager(
     private val context: Application,
     private val xmlManager: XmlManager,
 ) {
-
     companion object {
         private const val TAG = "PluginInstaller"
 
@@ -61,10 +65,15 @@ class InstallerManager(
         const val DEX_OPTIMIZED_DIR_NAME = "dex_opt"
         const val CLASS_INDEX_FILENAME = "class_index"
 
+        // --- 核心元数据 (必要) ---
         private const val META_PLUGIN_ID = "plugin.id"
         private const val META_PLUGIN_VERSION = "plugin.version"
-        private const val META_PLUGIN_DESCRIPTION = "plugin.description"
         private const val META_PLUGIN_ENTRY_CLASS = "plugin.entryClass"
+        // --- 其他元数据 (可选) ---
+        private const val META_PLUGIN_NAME = "plugin.name"
+        private const val META_PLUGIN_ICON_URL = "plugin.iconUrl"
+        private const val META_PLUGIN_DESCRIPTION = "plugin.description"
+
         private const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
     }
 
@@ -72,15 +81,19 @@ class InstallerManager(
      * 从插件 `AndroidManifest.xml` 中解析出的核心配置信息。
      *
      * @property pluginId 插件的唯一标识符。
-     * @property pluginVersion 插件的版本号。
+     * @property name 插件的名称。
+     * @property iconUrl 插件的图标URL。
      * @property pluginDescription 插件的功能描述。
+     * @property pluginVersion 插件的版本号。
      * @property entryClass 插件的入口类全限定名。
      */
     @Serializable
     data class PluginConfig(
         val pluginId: String,
-        val pluginVersion: String,
+        val name: String,
+        val iconUrl: String,
         val pluginDescription: String,
+        val pluginVersion: String,
         val entryClass: String,
     )
 
@@ -113,16 +126,24 @@ class InstallerManager(
     /**
      * 异步安装一个插件。
      * 此方法会执行完整的安装流程，包括签名验证、版本检查、文件复制、组件解析和信息持久化。
+     * API权限要求：[PermissionLevel.HOST]
      *
      * @param pluginApkFile 待安装的插件APK文件。
      * @param forceOverwrite 是否强制覆盖安装。如果为 `true`，则会忽略版本检查，直接覆盖现有插件。
      * 默认为 `false`。
      * @return [InstallResult] 对象，表示安装成功或失败。
+     * @see[RequiresPermission]
      */
+    @RequiresPermission(PermissionLevel.HOST)
     suspend fun installPlugin(
         pluginApkFile: File,
         forceOverwrite: Boolean = false,
     ): InstallResult = withContext(Dispatchers.IO) {
+        if (::installPlugin.javaMethod?.checkApiCaller() == false) {
+            Timber.w("权限不足：插件安装操作被拒绝")
+            return@withContext InstallResult.Failure("权限不足")
+        }
+
         Timber.tag(TAG).i("开始安装插件: ${pluginApkFile.name}, forceOverwrite: $forceOverwrite")
 
         // 步骤 1 & 2: 验证文件和元数据
@@ -130,9 +151,9 @@ class InstallerManager(
         val pluginConfig = validateAndParseConfig(pluginApkFile)
             ?: return@withContext InstallResult.Failure("插件配置元数据验证失败")
 
-        val validationResult = checkSignature(pluginApkFile, pluginConfig.pluginId)
-        if (!validationResult.isValid) {
-            return@withContext InstallResult.Failure("插件签名验证失败: ${validationResult.reason}")
+        val validationResult = checkSignatureAndAuthorize(pluginApkFile, pluginConfig)
+        if (!validationResult.isSuccess) {
+            return@withContext InstallResult.Failure(validationResult.reason)
         }
 
         val pluginId = pluginConfig.pluginId
@@ -193,10 +214,12 @@ class InstallerManager(
             // 步骤 8: 更新 plugins.xml
             val pluginInfo = PluginInfo(
                 pluginId = pluginConfig.pluginId,
+                name = pluginConfig.name,
+                iconUrl = pluginConfig.iconUrl,
+                description = pluginConfig.pluginDescription,
                 version = pluginConfig.pluginVersion,
                 path = targetApkFile.absolutePath,
                 entryClass = pluginConfig.entryClass,
-                description = pluginConfig.pluginDescription,
                 enabled = existingPlugin?.enabled ?: true,
                 installTime = existingPlugin?.installTime ?: System.currentTimeMillis(),
                 staticReceivers = staticReceivers,
@@ -235,11 +258,19 @@ class InstallerManager(
     /**
      * 卸载一个插件。
      * 这是一个事务性操作，会先将插件目录重命名，删除成功后再更新配置文件，以保证操作的原子性。
+     * API权限要求：[PermissionLevel.SELF]
      *
      * @param pluginId 要卸载的插件的唯一标识符。
      * @return `true` 如果卸载成功，否则返回 `false`。
+     * @see[RequiresPermission]
      */
-    fun uninstallPlugin(pluginId: String): Boolean {
+    @RequiresPermission(PermissionLevel.SELF)
+    suspend fun uninstallPlugin(pluginId: String): Boolean {
+        if (::uninstallPlugin.javaMethod?.checkApiCaller(pluginId) == false) {
+            Timber.w("权限不足：插件卸载操作被拒绝")
+            return false
+        }
+
         Timber.tag(TAG).i("开始事务性卸载插件: $pluginId")
 
         // 清理插件的 DexOpt 缓存
@@ -393,21 +424,24 @@ class InstallerManager(
             val pluginVersion = metaData.getString(META_PLUGIN_VERSION)
             val entryClass = metaData.getString(META_PLUGIN_ENTRY_CLASS)
 
-            if (pluginId.isNullOrBlank()) {
-                Timber.tag(TAG).e("元数据 '$META_PLUGIN_ID' 不能为空。")
-                return null
-            }
-            if (pluginVersion.isNullOrBlank()) {
-                Timber.tag(TAG).e("元数据 '$META_PLUGIN_VERSION' 不能为空。")
-                return null
-            }
-            if (entryClass.isNullOrBlank()) {
-                Timber.tag(TAG).e("元数据 '$META_PLUGIN_ENTRY_CLASS' 不能为空。")
+            if (pluginId.isNullOrBlank() || pluginVersion.isNullOrBlank() || entryClass.isNullOrBlank()) {
+                Timber.tag(TAG).e("核心元数据 (id, version, entryClass) 不能为空。")
                 return null
             }
 
+            // --- 读取可选元数据 ---
+            val name = metaData.getString(META_PLUGIN_NAME) ?: pluginId
+            val iconUrl = metaData.getString(META_PLUGIN_ICON_URL) ?: ""
             val pluginDescription = metaData.getString(META_PLUGIN_DESCRIPTION) ?: ""
-            val pluginConfig = PluginConfig(pluginId, pluginVersion, pluginDescription, entryClass)
+
+            val pluginConfig = PluginConfig(
+                pluginId = pluginId,
+                name = name,
+                iconUrl = iconUrl,
+                pluginDescription = pluginDescription,
+                pluginVersion = pluginVersion,
+                entryClass = entryClass
+            )
 
             Timber.tag(TAG).d("插件元数据配置验证通过: ${pluginConfig.pluginId}")
             return pluginConfig
@@ -722,51 +756,43 @@ class InstallerManager(
         }
     }
 
-    // 新增：封装签名检查逻辑
-    private suspend fun checkSignature(pluginApkFile: File, pluginId: String): ValidationResult {
-        val strategy = PluginManager.validationStrategy
-        val hostSignatures = SignatureValidator.getHostSignatures(context)
+    private suspend fun checkSignatureAndAuthorize(pluginApkFile: File, pluginConfig: PluginConfig): ValidationResult {
         val pluginSignatures = SignatureValidator.getPluginSignatures(context, pluginApkFile.absolutePath)
-
         if (pluginSignatures.isEmpty()) {
             return ValidationResult(false, "无法获取插件签名")
         }
 
-        return when (strategy) {
-            is ValidationStrategy.Strict -> {
-                if (hostSignatures.containsAll(pluginSignatures)) {
+        val hostSignatures = SignatureValidator.getHostSignatures(context)
+        val matchesHostSignature = hostSignatures.containsAll(pluginSignatures)
+
+        return when (PluginManager.validationStrategy) {
+            ValidationStrategy.Strict -> {
+                if (matchesHostSignature) ValidationResult(true)
+                else ValidationResult(false, "签名不匹配 (严格模式)")
+            }
+            ValidationStrategy.UserGrant -> {
+                if (matchesHostSignature) {
                     ValidationResult(true)
                 } else {
-                    ValidationResult(false, "插件签名与宿主不一致")
+                    val request = AuthorizationRequest.forInstall(
+                        pluginId = pluginConfig.pluginId,
+                        name = pluginConfig.name,
+                        iconUrl = pluginConfig.iconUrl,
+                        description = pluginConfig.pluginDescription,
+                        version = pluginConfig.pluginVersion,
+                        signature = pluginSignatures.first(),
+                    )
+                    val authorized = PluginManager.authorizationManager.requestAuthorization(request, hardFail = false)
+                    if (authorized) ValidationResult(true)
+                    else ValidationResult(false, "用户拒绝安装")
                 }
             }
-            is ValidationStrategy.Whitelist -> {
-                val allTrustedSignatures = hostSignatures + strategy.trustedSignatures
-                if (allTrustedSignatures.containsAll(pluginSignatures)) {
-                    ValidationResult(true)
-                } else {
-                    ValidationResult(false, "插件签名不在白名单内")
-                }
-            }
-            is ValidationStrategy.UserGrant -> {
-                if (hostSignatures.containsAll(pluginSignatures)) {
-                    return ValidationResult(true)
-                }
-                val approved = withContext(Dispatchers.Main) {
-                    strategy.onAuthorizationRequest(pluginId, pluginSignatures.first())
-                }
-                if (approved) {
-                    ValidationResult(true)
-                } else {
-                    ValidationResult(false, "用户拒绝授权")
-                }
-            }
-            is ValidationStrategy.Insecure -> {
-                Timber.tag(TAG).w("警告：正在使用 Insecure 模式，签名校验已禁用！")
+            ValidationStrategy.Insecure -> {
+                Timber.w("警告：正在使用 Insecure 模式，已跳过签名校验！")
                 ValidationResult(true)
             }
         }
     }
 
-    private data class ValidationResult(val isValid: Boolean, val reason: String? = null)
+    private data class ValidationResult(val isSuccess: Boolean, val reason: String = "")
 }

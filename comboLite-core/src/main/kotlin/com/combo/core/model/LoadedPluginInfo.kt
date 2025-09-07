@@ -14,25 +14,16 @@
  * limitations under the License.
  */
 
-package com.combo.plugin.sample.guide
+package com.combo.core.model
 
-import androidx.compose.runtime.Composable
-import com.combo.core.api.IPluginEntryClass
-import com.combo.core.model.PluginContext
-import org.koin.core.module.Module
+import com.combo.core.runtime.loader.PluginClassLoader
 
-class PluginEntryClass : IPluginEntryClass {
-    override val pluginModule: List<Module>
-        get() = emptyList()
-
-    @Composable
-    override fun Content() {
-        GuideMainScreen()
-    }
-
-    override fun onLoad(context: PluginContext) {
-    }
-
-    override fun onUnload() {
-    }
-}
+/**
+ * 包含已加载插件的详细运行时信息。
+ * @property pluginInfo 插件的静态描述信息。
+ * @property classLoader 插件专属的类加载器。
+ */
+data class LoadedPluginInfo(
+    val pluginInfo: PluginInfo,
+    val classLoader: PluginClassLoader,
+)

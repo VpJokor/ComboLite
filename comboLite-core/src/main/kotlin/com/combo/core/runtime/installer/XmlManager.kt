@@ -68,6 +68,7 @@ class XmlManager(
         private const val ATTR_EXPORTED = "exported" // [新增]
         private const val ATTR_INSTALL_TIME = "installTime"
         private const val ATTR_NAME = "name"
+        private const val ATTR_ICON_URL = "iconUrl"
 
         // Receiver
         private const val TAG_RECEIVERS = "receivers"
@@ -258,6 +259,8 @@ class XmlManager(
                                         PluginInfo(
                                             pluginId = parser.getAttributeValue(null, ATTR_ID)
                                                 ?: "",
+                                            name = parser.getAttributeValue(null, ATTR_NAME) ?: "",
+                                            iconUrl = parser.getAttributeValue(null, ATTR_ICON_URL) ?: "",
                                             version = parser.getAttributeValue(null, ATTR_VERSION)
                                                 ?: "",
                                             entryClass =
@@ -489,6 +492,8 @@ class XmlManager(
                 plugins.forEach { plugin ->
                     serializer.startTag(null, TAG_PLUGIN)
                     serializer.attribute(null, ATTR_ID, plugin.pluginId)
+                    serializer.attribute(null, ATTR_NAME, plugin.name)
+                    serializer.attribute(null, ATTR_ICON_URL, plugin.iconUrl)
                     serializer.attribute(null, ATTR_VERSION, plugin.version)
                     serializer.attribute(null, ATTR_ENTRY_CLASS, plugin.entryClass)
                     serializer.attribute(null, ATTR_PATH, plugin.path)
