@@ -16,6 +16,9 @@
 
 package com.combo.core.model
 
+import java.io.Serializable
+
+
 /**
  * 封装了插件崩溃的详细信息。
  *
@@ -27,4 +30,4 @@ data class PluginCrashInfo(
     val throwable: Throwable,
     val culpritPluginId: String?,
     val defaultMessage: String
-)
+) : Serializable

@@ -17,111 +17,88 @@
 package com.combo.core.security.crash
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Process
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.combo.core.component.activity.BasePluginActivity
+import com.combo.core.model.PluginCrashInfo
+import com.combo.core.runtime.PluginManager
+import com.combo.core.ui.CrashScreen
+import com.combo.core.ui.component.SystemAppearance
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 class CrashActivity : BasePluginActivity() {
-    private var message: String = "应用遇到未知问题，已被自动修复。\n请重启应用以恢复正常。"
+
+    private lateinit var crashInfo: PluginCrashInfo
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val intent = proxyActivity?.intent
 
-        this.message = proxyActivity?.intent?.getStringExtra(PluginCrashHandler.EXTRA_CRASH_MESSAGE)
-            ?: this.message
+        crashInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent?.getSerializableExtra(PluginCrashHandler.EXTRA_CRASH_INFO, PluginCrashInfo::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getSerializableExtra(PluginCrashHandler.EXTRA_CRASH_INFO) as? PluginCrashInfo
+        } ?: createDefaultCrashInfo()
 
         proxyActivity?.setContent {
-            MaterialTheme {
-                CrashScreen(
-                    message = this.message,
-                    onRestart = {
-                        proxyActivity?.let { activity ->
-                            val intent =
-                                activity.packageManager.getLaunchIntentForPackage(activity.packageName)
-                            val restartIntent = Intent.makeRestartActivityTask(intent!!.component)
-                            activity.startActivity(restartIntent)
+            SystemAppearance(!isSystemInDarkTheme())
+            CrashScreen(
+                crashInfo = crashInfo,
+                onCloseApp = { handleCloseApp() },
+                onRestartApp = { disablePlugin ->
+                    handleRestartApp(disablePlugin)
+                }
+            )
+        }
+    }
 
-                            Process.killProcess(Process.myPid())
-                            exitProcess(10)
-                        }
-                    }
-                )
+    /**
+     * 处理关闭应用的逻辑
+     */
+    private fun handleCloseApp() {
+        proxyActivity?.let { activity ->
+            activity.finishAndRemoveTask()
+            killProcess()
+        }
+    }
+
+    /**
+     * 处理重启应用的逻辑
+     * @param disablePlugin 用户是否选择禁用插件
+     */
+    private fun handleRestartApp(disablePlugin: Boolean) {
+        CoroutineScope(Dispatchers.IO).launch {
+            if (disablePlugin && crashInfo.culpritPluginId != null && crashInfo.culpritPluginId != "未知") {
+                PluginManager.setPluginEnabled(crashInfo.culpritPluginId!!, false)
+            }
+
+            proxyActivity?.let { activity ->
+                val intent = activity.packageManager.getLaunchIntentForPackage(activity.packageName)
+                val restartIntent = Intent.makeRestartActivityTask(intent!!.component)
+                activity.startActivity(restartIntent)
+
+                killProcess()
             }
         }
     }
-}
 
-/**
- * 崩溃提示页面的 Composable UI
- */
-@Composable
-private fun CrashScreen(
-    message: String,
-    onRestart: () -> Unit
-) {
-    Scaffold { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 32.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Warning,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
+    private fun killProcess() {
+        Process.killProcess(Process.myPid())
+        exitProcess(10)
+    }
 
-                Text(
-                    text = "哎呀，程序开小差了",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Button(
-                    onClick = onRestart,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("重启应用", style = MaterialTheme.typography.titleMedium)
-                }
-            }
-        }
+    private fun createDefaultCrashInfo(): PluginCrashInfo {
+        return PluginCrashInfo(
+            throwable = IllegalStateException("无法从Intent中获取原始崩溃信息。"),
+            culpritPluginId = "未知",
+            defaultMessage = "应用遇到未知问题，已被自动修复。"
+        )
     }
 }

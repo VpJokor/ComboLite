@@ -25,9 +25,6 @@ import com.combo.core.exception.PluginDependencyException
 import com.combo.core.model.PluginCrashInfo
 import com.combo.core.runtime.PluginManager
 import com.combo.core.utils.startPluginActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import timber.log.Timber
 import kotlin.system.exitProcess
 
@@ -48,7 +45,7 @@ class PluginCrashHandler private constructor(
 ) : Thread.UncaughtExceptionHandler {
 
     companion object {
-        const val EXTRA_CRASH_MESSAGE = "CRASH_MESSAGE"
+        const val EXTRA_CRASH_INFO = "CRASH_INFO"
         private var crashCallback: IPluginCrashCallback? = null
 
         /**
@@ -85,16 +82,13 @@ class PluginCrashHandler private constructor(
 
     override fun uncaughtException(thread: Thread, throwable: Throwable) {
         try {
-            // 尝试将异常作为插件相关异常来处理
             val wasHandled = handlePluginRelatedException(throwable)
 
-            // 如果插件异常处理器没有处理它，则交由默认处理器
             if (!wasHandled) {
                 Timber.d("异常并非由插件引起，或未被自定义回调处理，交由默认处理器。")
                 defaultHandler?.uncaughtException(thread, throwable)
             }
         } catch (e: Exception) {
-            // 确保即使在我们的处理逻辑中也发生异常，也不会丢失原始的崩溃信息
             Timber.e(e, "在PluginCrashHandler内部处理异常时发生错误！")
             defaultHandler?.uncaughtException(thread, throwable)
         }
@@ -103,15 +97,15 @@ class PluginCrashHandler private constructor(
     private fun handlePluginRelatedException(throwable: Throwable): Boolean {
         val culpritPluginId = findCulpritPluginId(throwable)
 
-        // 1. 依赖缺失异常 (最明确)
+        // 1. 依赖缺失异常
         findCause<PluginDependencyException>(throwable)?.let {
             val info = PluginCrashInfo(
                 it,
                 it.culpritPluginId,
-                "功能模块 '${it.culpritPluginId}' 缺少必要的依赖组件 '${it.missingClassName}'。"
+                "该插件缺少必要的依赖组件 (${it.missingClassName.substringAfterLast('.')})，无法正常工作。"
             )
             if (crashCallback?.onDependencyException(info) == true) return true
-            handlePluginExceptionByDefault(info)
+            showCrashActivity(info)
             return true
         }
 
@@ -121,10 +115,10 @@ class PluginCrashHandler private constructor(
                 val info = PluginCrashInfo(
                     it,
                     culpritPluginId,
-                    "功能模块 '$culpritPluginId' 似乎未能完全更新，导致组件冲突。"
+                    "插件可能未能完全更新，导致内部组件冲突。"
                 )
                 if (crashCallback?.onClassCastException(info) == true) return true
-                handleIncompatibleUpdateByDefault(info)
+                showCrashActivity(info)
                 return true
             }
         }
@@ -135,10 +129,10 @@ class PluginCrashHandler private constructor(
                 val info = PluginCrashInfo(
                     it,
                     culpritPluginId,
-                    "功能模块 '$culpritPluginId' 尝试访问一个不存在的资源。"
+                    "插件尝试访问一个不存在的内部资源。"
                 )
                 if (crashCallback?.onResourceNotFoundException(info) == true) return true
-                handleIncompatibleUpdateByDefault(info)
+                showCrashActivity(info)
                 return true
             }
         }
@@ -149,10 +143,10 @@ class PluginCrashHandler private constructor(
                 val info = PluginCrashInfo(
                     throwable,
                     culpritPluginId,
-                    "功能模块 '$culpritPluginId' 与当前应用版本不兼容。"
+                    "该插件版本与当前应用版本不兼容。"
                 )
                 if (crashCallback?.onApiIncompatibleException(info) == true) return true
-                handlePluginExceptionByDefault(info)
+                showCrashActivity(info)
                 return true
             }
         }
@@ -162,48 +156,23 @@ class PluginCrashHandler private constructor(
             val info = PluginCrashInfo(
                 throwable,
                 culpritPluginId,
-                "功能模块 '$culpritPluginId' 发生未知错误。"
+                "插件发生了一个未知错误，导致其无法正常运行。"
             )
             if (crashCallback?.onOtherPluginException(info) == true) return true
-            handlePluginExceptionByDefault(info)
+            showCrashActivity(info)
             return true
         }
 
         return false
     }
 
-    /**
-     * 默认处理方式 A：禁用肇事插件，并提示用户
-     */
-    private fun handlePluginExceptionByDefault(info: PluginCrashInfo) {
-        CoroutineScope(Dispatchers.Main).launch {
-            Timber.e(info.throwable, "默认处理：将禁用插件 [${info.culpritPluginId}]")
-            info.culpritPluginId?.let { PluginManager.setPluginEnabled(it, false) }
 
-            val message = "${info.defaultMessage}\n该模块已被临时禁用，重启应用后即可恢复其他功能。"
-            showCrashActivity(message)
-            killProcess()
-        }
-    }
-
-    /**
-     * 默认处理方式 B：不禁用插件，但强制用户重启
-     */
-    private fun handleIncompatibleUpdateByDefault(info: PluginCrashInfo) {
-        Timber.e(
-            info.throwable,
-            "默认处理：插件 [${info.culpritPluginId}] 发生更新不兼容问题，要求重启。"
-        )
-        val message = "${info.defaultMessage}\n请重启应用以完成更新并解决此问题。"
-        showCrashActivity(message)
-        killProcess()
-    }
-
-    private fun showCrashActivity(message: String) {
+    private fun showCrashActivity(crashInfo: PluginCrashInfo) {
         context.startPluginActivity(CrashActivity::class.java) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            putExtra(EXTRA_CRASH_MESSAGE, message)
+            putExtra(EXTRA_CRASH_INFO, crashInfo)
         }
+        killProcess()
     }
 
     private fun killProcess() {

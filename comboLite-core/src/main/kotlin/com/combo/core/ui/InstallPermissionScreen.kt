@@ -1,0 +1,241 @@
+/*
+ * Copyright (c) 2025, 贵州君城网络科技有限公司
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.combo.core.ui
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.combo.core.model.AuthorizationRequest
+import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_DESCRIPTION
+import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_NAME
+import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_VERSION
+import com.combo.core.model.AuthorizationRequest.Companion.KEY_SIGNATURE_HASH
+import com.combo.core.ui.component.PrimaryButton
+import com.combo.core.ui.theme.AppTheme
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun InstallPermissionScreen(
+    request: AuthorizationRequest,
+    onResult: (Boolean) -> Unit,
+    onExit: () -> Unit
+) {
+    val details = request.details
+    val pluginName = details[KEY_PLUGIN_NAME] ?: request.callingPluginId
+    val pluginVersion = details[KEY_PLUGIN_VERSION] ?: "未知版本"
+    val pluginDescription = (details[KEY_PLUGIN_DESCRIPTION] ?: "无").ifBlank { "无" }
+    val signature = details[KEY_SIGNATURE_HASH]?.chunked(16)?.joinToString("\n") ?: "未知"
+
+    AppTheme {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("系统提示") },
+                    navigationIcon = {
+                        IconButton(onClick = onExit) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = "返回"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AccountCircle, // 占位符图标
+                            contentDescription = "Plugin Icon",
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(text = pluginName, style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            text = "版本 $pluginVersion",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // 2. 警告信息
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Info,
+                        contentDescription = "Warning",
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "未知插件安装",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                // 3. 详细信息 (允许复制)
+                SelectionContainer {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        InfoRowStyled("插件 ID", request.callingPluginId)
+                        InfoRowStyled("描述", pluginDescription)
+                        InfoRowStyled("签名指纹", signature)
+                    }
+                }
+
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                // 4. 按钮区域
+                Column(
+                    modifier = Modifier.padding(bottom = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    PrimaryButton(
+                        text = "仍然安装",
+                        onClick = { onResult(true) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TextButton(onClick = { onResult(false) }) {
+                        Text("取消")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoRowStyled(label: String, value: String) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 5,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+
+@Preview(showBackground = true, name = "Install Permission Light")
+@Composable
+fun InstallPermissionScreenLightPreview() {
+    val request = AuthorizationRequest(
+        type = AuthorizationRequest.RequestType.INSTALL_PERMISSION,
+        callingPluginId = "com.example.beautify",
+        details = mapOf(
+            KEY_PLUGIN_NAME to "美化工具",
+            KEY_PLUGIN_VERSION to "2.1.0",
+            KEY_PLUGIN_DESCRIPTION to "一款强大的界面美化工具，提供多种主题和自定义选项。",
+            KEY_SIGNATURE_HASH to "SHA256:8F:E9:B3:D2:A7:C8:E4:F5:1A:B2:D3:E6:7F:8C:9A:0B"
+        )
+    )
+    InstallPermissionScreen(request = request, onResult = {}, onExit = {})
+}
+
+@Preview(showBackground = true, name = "Install Permission Dark")
+@Composable
+fun InstallPermissionScreenDarkPreview() {
+    AppTheme(darkTheme = true) {
+        val request = AuthorizationRequest(
+            type = AuthorizationRequest.RequestType.INSTALL_PERMISSION,
+            callingPluginId = "com.example.beautify",
+            details = mapOf(
+                KEY_PLUGIN_NAME to "美化工具",
+                KEY_PLUGIN_VERSION to "2.1.0",
+                KEY_PLUGIN_DESCRIPTION to "一款强大的界面美化工具，提供多种主题和自定义选项。",
+                KEY_SIGNATURE_HASH to "SHA256:8F:E9:B3:D2:A7:C8:E4:F5:1A:B2:D3:E6:7F:8C:9A:0B"
+            )
+        )
+        InstallPermissionScreen(request = request, onResult = {}, onExit = {})
+    }
+}

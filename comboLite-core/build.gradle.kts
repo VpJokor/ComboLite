@@ -64,6 +64,7 @@ dependencies {
     implementation(libs.androidx.compose.runtime)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui.tooling.preview)
 
     // 序列化支持
     implementation(libs.kotlinx.serialization.json)
@@ -81,6 +82,7 @@ dependencies {
     implementation(libs.coil.kt)
     implementation(libs.coil.okhttp)
     implementation(libs.coil.kt.compose)
+    implementation(libs.androidx.ui.tooling)
 }
 
 mavenPublishing {
