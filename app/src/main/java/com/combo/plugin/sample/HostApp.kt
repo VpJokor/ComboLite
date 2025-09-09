@@ -41,10 +41,7 @@ class HostApp : BaseHostApplication(),IPluginCrashCallback {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
-        // 设置插件验证策略
-        CoroutineScope(Dispatchers.Main).launch {
-            setValidationStrategy(ValidationStrategy.UserGrant)
-        }
+
         PluginManager.apply {
             proxyManager.setHostActivity(HostActivity::class.java)
             proxyManager.setServicePool(
@@ -64,70 +61,71 @@ class HostApp : BaseHostApplication(),IPluginCrashCallback {
             proxyManager.setHostProviderAuthority("com.combo.plugin.sample.provider")
         }
 
+        CoroutineScope(Dispatchers.IO).launch {
+            // 设置插件验证策略
+            setValidationStrategy(ValidationStrategy.UserGrant)
+            // 设置插件崩溃处理回调
+            PluginCrashHandler.setGlobalClashCallback(
+                object : IPluginCrashCallback {
+                    /**
+                     * 当插件因 ClassCastException 崩溃时调用。
+                     * 通常发生在插件热更新后，新旧类的实例冲突。
+                     *
+                     * @param info 崩溃详情。
+                     * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
+                     */
+                    override fun onClassCastException(info: PluginCrashInfo): Boolean {
+                        Timber.e(info.throwable, "插件ClassCastException ${info.culpritPluginId}")
+                        return false
+                    }
 
+                    /**
+                     * 当插件因 PluginDependencyException (ClassNotFound) 崩溃时调用。
+                     *
+                     * @param info 崩溃详情。
+                     * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
+                     */
+                    override fun onDependencyException(info: PluginCrashInfo): Boolean {
+                        Timber.e(info.throwable, "插件PluginDependencyException ${info.culpritPluginId}")
+                        return false
+                    }
 
+                    /**
+                     * 当插件因 Resources.NotFoundException 崩溃时调用。
+                     * 通常发生在插件更新后，代码尝试访问一个不再存在的资源ID。
+                     *
+                     * @param info 崩溃详情。
+                     * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
+                     */
+                    override fun onResourceNotFoundException(info: PluginCrashInfo): Boolean {
+                        Timber.e(info.throwable, "插件Resources.NotFoundException ${info.culpritPluginId}")
+                        return false
+                    }
 
-        // 设置插件崩溃处理回调
-        PluginCrashHandler.setCallback(
-            object : IPluginCrashCallback {
-                /**
-                 * 当插件因 ClassCastException 崩溃时调用。
-                 * 通常发生在插件热更新后，新旧类的实例冲突。
-                 *
-                 * @param info 崩溃详情。
-                 * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
-                 */
-                override fun onClassCastException(info: PluginCrashInfo): Boolean {
-                    Timber.e(info.throwable, "插件ClassCastException ${info.culpritPluginId}")
-                    return false
+                    /**
+                     * 当插件因 API 不兼容 (如 NoSuchMethodError, NoSuchFieldError) 崩溃时调用。
+                     *
+                     * @param info 崩溃详情。
+                     * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
+                     */
+                    override fun onApiIncompatibleException(info: PluginCrashInfo): Boolean {
+                        Timber.e(info.throwable, "插件onApiIncompatibleException ${info.culpritPluginId}")
+                        return false
+                    }
+
+                    /**
+                     * 当发生其他与插件相关的未知异常时调用。
+                     *
+                     * @param info 崩溃详情。
+                     * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
+                     */
+                    override fun onOtherPluginException(info: PluginCrashInfo): Boolean {
+                        Timber.e(info.throwable, "插件onOtherPluginException ${info.culpritPluginId}")
+                        return false
+                    }
                 }
-
-                /**
-                 * 当插件因 PluginDependencyException (ClassNotFound) 崩溃时调用。
-                 *
-                 * @param info 崩溃详情。
-                 * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
-                 */
-                override fun onDependencyException(info: PluginCrashInfo): Boolean {
-                    Timber.e(info.throwable, "插件PluginDependencyException ${info.culpritPluginId}")
-                    return false
-                }
-
-                /**
-                 * 当插件因 Resources.NotFoundException 崩溃时调用。
-                 * 通常发生在插件更新后，代码尝试访问一个不再存在的资源ID。
-                 *
-                 * @param info 崩溃详情。
-                 * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
-                 */
-                override fun onResourceNotFoundException(info: PluginCrashInfo): Boolean {
-                    Timber.e(info.throwable, "插件Resources.NotFoundException ${info.culpritPluginId}")
-                    return false
-                }
-
-                /**
-                 * 当插件因 API 不兼容 (如 NoSuchMethodError, NoSuchFieldError) 崩溃时调用。
-                 *
-                 * @param info 崩溃详情。
-                 * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
-                 */
-                override fun onApiIncompatibleException(info: PluginCrashInfo): Boolean {
-                    Timber.e(info.throwable, "插件onApiIncompatibleException ${info.culpritPluginId}")
-                    return false
-                }
-
-                /**
-                 * 当发生其他与插件相关的未知异常时调用。
-                 *
-                 * @param info 崩溃详情。
-                 * @return `true` 表示已处理该异常，框架不再执行默认逻辑；`false` 则继续执行默认逻辑。
-                 */
-                override fun onOtherPluginException(info: PluginCrashInfo): Boolean {
-                    Timber.e(info.throwable, "插件onOtherPluginException ${info.culpritPluginId}")
-                    return false
-                }
-            }
-        )
+            )
+        }
 
         loadKoinModules(
             module {

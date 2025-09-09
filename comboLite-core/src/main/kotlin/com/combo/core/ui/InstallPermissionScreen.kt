@@ -16,9 +16,8 @@
 
 package com.combo.core.ui
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,11 +27,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,8 +45,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.combo.core.model.AuthorizationRequest
@@ -56,6 +54,7 @@ import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_DESCRIPTIO
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_NAME
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_VERSION
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_SIGNATURE_HASH
+import com.combo.core.ui.component.InfoRowStyled
 import com.combo.core.ui.component.PrimaryButton
 import com.combo.core.ui.theme.AppTheme
 
@@ -76,7 +75,7 @@ fun InstallPermissionScreen(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text("系统提示") },
+                    title = {  },
                     navigationIcon = {
                         IconButton(onClick = onExit) {
                             Icon(
@@ -97,40 +96,34 @@ fun InstallPermissionScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // 1. 插件图标和名称
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = android.R.mipmap.sym_def_app_icon),
+                        contentDescription = "Plugin Icon",
                         modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.AccountCircle, // 占位符图标
-                            contentDescription = "Plugin Icon",
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                    )
                     Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(text = pluginName, style = MaterialTheme.typography.titleLarge)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = pluginName, style = MaterialTheme.typography.titleMedium, maxLines = 1)
                         Text(
                             text = "版本 $pluginVersion",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
                         )
                     }
                 }
 
+                Spacer(modifier = Modifier.height(24.dp))
                 // 2. 警告信息
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -141,14 +134,14 @@ fun InstallPermissionScreen(
                     Icon(
                         imageVector = Icons.Rounded.Info,
                         contentDescription = "Warning",
-                        tint = MaterialTheme.colorScheme.error
+                        tint = MaterialTheme.colorScheme.tertiary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "未知插件安装",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.error
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                 }
 
@@ -167,9 +160,7 @@ fun InstallPermissionScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                // 4. 按钮区域
                 Column(
-                    modifier = Modifier.padding(bottom = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     PrimaryButton(
@@ -185,26 +176,6 @@ fun InstallPermissionScreen(
         }
     }
 }
-
-@Composable
-private fun InfoRowStyled(label: String, value: String) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 5,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
 
 @Preview(showBackground = true, name = "Install Permission Light")
 @Composable

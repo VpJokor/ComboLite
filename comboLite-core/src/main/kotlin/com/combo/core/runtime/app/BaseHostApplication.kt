@@ -32,7 +32,7 @@ open class BaseHostApplication : Application() {
      */
     override fun onCreate() {
         super.onCreate()
-        PluginCrashHandler.Companion.initialize(this)
+        PluginCrashHandler.initialize(this)
         PluginManager.initialize(
             context = this,
         ) {

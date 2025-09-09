@@ -16,7 +16,7 @@
 
 package com.combo.core.security.crash
 
-import android.content.Context
+import android.app.Application
 import android.content.Intent
 import android.content.res.Resources
 import android.os.Process
@@ -24,59 +24,86 @@ import android.os.Process.killProcess
 import com.combo.core.exception.PluginDependencyException
 import com.combo.core.model.PluginCrashInfo
 import com.combo.core.runtime.PluginManager
+import com.combo.core.security.permission.PermissionLevel
+import com.combo.core.security.permission.RequiresPermission
+import com.combo.core.security.permission.checkApiCaller
 import com.combo.core.utils.startPluginActivity
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.reflect.jvm.javaMethod
 import kotlin.system.exitProcess
 
 /**
  * 全局插件崩溃处理器
  *
- * 作为一个全局的"安全网"，负责捕获、识别、并分发所有由插件引起的致命异常。
- *
  * 核心职责:
- * 1.  **精准识别**: 捕获多种插件化场景下的常见异常（依赖、类型转换、资源、API兼容性等）。
- * 2.  **定位源头**: 通过分析堆栈轨迹，尽可能找到引发崩溃的具体插件。
- * 3.  **委托处理**: 允许开发者通过注册 `IPluginCrashCallback` 自定义处理逻辑。
- * 4.  **默认保障**: 如果开发者未处理，则执行默认的容错逻辑（禁用插件、友好提示、重启应用）。
+ * 1.  **精准识别**: 捕获多种插件化场景下的常见异常。
+ * 2.  **定位源头**: 通过分析堆栈轨迹，找到引发崩溃的具体插件。
+ * 3.  **分级委托**: 优先调用插件专属的回调，如果未处理再调用宿主设置的全局回调。
+ * 4.  **默认保障**: 如果所有回调都未处理，则执行默认的容错逻辑（显示UI、重启应用）。
  */
-class PluginCrashHandler private constructor(
-    private val context: Context,
-    private val defaultHandler: Thread.UncaughtExceptionHandler?
-) : Thread.UncaughtExceptionHandler {
+object PluginCrashHandler : Thread.UncaughtExceptionHandler {
 
-    companion object {
-        const val EXTRA_CRASH_INFO = "CRASH_INFO"
-        private var crashCallback: IPluginCrashCallback? = null
+    const val EXTRA_CRASH_INFO = "CRASH_INFO"
 
-        /**
-         * 初始化并注册全局崩溃处理器
-         * @param context Application Context
-         * @param callback （可选）开发者的自定义崩溃处理回调
-         */
-        @JvmStatic
-        fun initialize(context: Context, callback: IPluginCrashCallback? = null) {
-            this.crashCallback = callback
-            val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+    private lateinit var context: Application
+    private var defaultHandler: Thread.UncaughtExceptionHandler? = null
+    private var globalCallback: IPluginCrashCallback? = null
+    private val pluginCallbacks = ConcurrentHashMap<String, IPluginCrashCallback>()
 
-            if (defaultHandler is PluginCrashHandler) {
-                Timber.w("PluginCrashHandler 已被初始化，无需重复设置。")
-                return
-            }
-            Thread.setDefaultUncaughtExceptionHandler(
-                PluginCrashHandler(context.applicationContext, defaultHandler)
-            )
-            Timber.i("全局插件崩溃处理器已成功注册。")
+    /**
+     * 初始化并注册全局崩溃处理器
+     * @param context Application Context
+     * @param globalCallback 宿主App的全局崩溃处理回调
+     */
+    @JvmStatic
+    fun initialize(context: Application) {
+        if (this::context.isInitialized) {
+            Timber.w("PluginCrashHandler 已被初始化，无需重复设置。")
+            return
         }
 
-        /**
-         * 设置或更新插件崩溃处理回调。
-         * 可以在 initialize 之后随时调用此方法来配置自定义处理逻辑。
-         * @param callback 开发者自定义的崩溃处理回调，传入 null 可清除。
-         */
-        @JvmStatic
-        fun setCallback(callback: IPluginCrashCallback?) {
-            this.crashCallback = callback
-            Timber.i("PluginCrashHandler 回调已更新。")
+        this.context = context
+        this.defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+
+        Thread.setDefaultUncaughtExceptionHandler(this)
+        Timber.i("全局插件崩溃处理器已成功注册。")
+    }
+
+    /**
+     * (供宿主使用) 设置或更新全局的插件崩溃处理回调。
+     * @param callback 宿主自定义的全局崩溃处理回调，传入 null 可清除。
+     */
+    @JvmStatic
+    @RequiresPermission(PermissionLevel.HOST, true)
+    suspend fun setGlobalClashCallback(callback: IPluginCrashCallback?) {
+        if (::setGlobalClashCallback.javaMethod?.checkApiCaller() == false) return
+        this.globalCallback = callback
+        Timber.i("PluginCrashHandler 全局回调已更新。")
+    }
+
+    /**
+     * (供插件使用) 为指定插件注册或注销其专属的崩溃回调。
+     * API权限要求：[PermissionLevel.SELF] - 插件只能为自己设置回调。
+     *
+     * @param pluginId 要设置回调的插件ID。权限检查将确保调用方就是该插件。
+     * @param callback 插件的崩溃回调实例。传入 null 可注销该插件的回调。
+     */
+    @JvmStatic
+    @RequiresPermission(PermissionLevel.SELF, true)
+    suspend fun setClashCallback(pluginId: String, callback: IPluginCrashCallback?) {
+        if (::setClashCallback.javaMethod?.checkApiCaller(targetPluginId = pluginId) == false) {
+            Timber.w("权限不足：插件尝试为 [$pluginId] 设置崩溃回调被拒绝。")
+            return
+        }
+
+        if (callback != null) {
+            pluginCallbacks[pluginId] = callback
+            Timber.d("为插件 [$pluginId] 注册了崩溃回调。")
+        } else {
+            if (pluginCallbacks.remove(pluginId) != null) {
+                Timber.d("已注销插件 [$pluginId] 的崩溃回调。")
+            }
         }
     }
 
@@ -85,7 +112,7 @@ class PluginCrashHandler private constructor(
             val wasHandled = handlePluginRelatedException(throwable)
 
             if (!wasHandled) {
-                Timber.d("异常并非由插件引起，或未被自定义回调处理，交由默认处理器。")
+                Timber.d("异常并非由插件引起，或未被任何回调处理，交由默认处理器。")
                 defaultHandler?.uncaughtException(thread, throwable)
             }
         } catch (e: Exception) {
@@ -96,15 +123,13 @@ class PluginCrashHandler private constructor(
 
     private fun handlePluginRelatedException(throwable: Throwable): Boolean {
         val culpritPluginId = findCulpritPluginId(throwable)
+        val pluginCallback = culpritPluginId?.let { pluginCallbacks[it] }
 
         // 1. 依赖缺失异常
         findCause<PluginDependencyException>(throwable)?.let {
-            val info = PluginCrashInfo(
-                it,
-                it.culpritPluginId,
-                "该插件缺少必要的依赖组件 (${it.missingClassName.substringAfterLast('.')})，无法正常工作。"
-            )
-            if (crashCallback?.onDependencyException(info) == true) return true
+            val info = PluginCrashInfo(it, it.culpritPluginId, "该插件缺少必要的依赖组件 (${it.missingClassName.substringAfterLast('.')})，无法正常工作。")
+            if (pluginCallback?.onDependencyException(info) == true) return true
+            if (globalCallback?.onDependencyException(info) == true) return true
             showCrashActivity(info)
             return true
         }
@@ -112,12 +137,9 @@ class PluginCrashHandler private constructor(
         // 2. 类型转换异常
         findCause<ClassCastException>(throwable)?.let {
             if (culpritPluginId != null) {
-                val info = PluginCrashInfo(
-                    it,
-                    culpritPluginId,
-                    "插件可能未能完全更新，导致内部组件冲突。"
-                )
-                if (crashCallback?.onClassCastException(info) == true) return true
+                val info = PluginCrashInfo(it, culpritPluginId, "插件可能未能完全更新，导致内部组件冲突。")
+                if (pluginCallback?.onClassCastException(info) == true) return true
+                if (globalCallback?.onClassCastException(info) == true) return true
                 showCrashActivity(info)
                 return true
             }
@@ -126,12 +148,9 @@ class PluginCrashHandler private constructor(
         // 3. 资源未找到异常
         findCause<Resources.NotFoundException>(throwable)?.let {
             if (culpritPluginId != null) {
-                val info = PluginCrashInfo(
-                    it,
-                    culpritPluginId,
-                    "插件尝试访问一个不存在的内部资源。"
-                )
-                if (crashCallback?.onResourceNotFoundException(info) == true) return true
+                val info = PluginCrashInfo(it, culpritPluginId, "插件尝试访问一个不存在的内部资源。")
+                if (pluginCallback?.onClassCastException(info) == true) return true
+                if (globalCallback?.onClassCastException(info) == true) return true
                 showCrashActivity(info)
                 return true
             }
@@ -140,12 +159,9 @@ class PluginCrashHandler private constructor(
         // 4. API不兼容异常
         if (throwable is NoSuchMethodError || throwable is NoSuchFieldError || throwable is AbstractMethodError) {
             if (culpritPluginId != null) {
-                val info = PluginCrashInfo(
-                    throwable,
-                    culpritPluginId,
-                    "该插件版本与当前应用版本不兼容。"
-                )
-                if (crashCallback?.onApiIncompatibleException(info) == true) return true
+                val info = PluginCrashInfo(throwable, culpritPluginId, "该插件版本与当前应用版本不兼容。")
+                if (pluginCallback?.onClassCastException(info) == true) return true
+                if (globalCallback?.onClassCastException(info) == true) return true
                 showCrashActivity(info)
                 return true
             }
@@ -153,19 +169,15 @@ class PluginCrashHandler private constructor(
 
         // 5. 其他与插件相关的异常
         if (culpritPluginId != null) {
-            val info = PluginCrashInfo(
-                throwable,
-                culpritPluginId,
-                "插件发生了一个未知错误，导致其无法正常运行。"
-            )
-            if (crashCallback?.onOtherPluginException(info) == true) return true
+            val info = PluginCrashInfo(throwable, culpritPluginId, "插件发生了一个未知错误，导致其无法正常运行。")
+            if (pluginCallback?.onOtherPluginException(info) == true) return true
+            if (globalCallback?.onOtherPluginException(info) == true) return true
             showCrashActivity(info)
             return true
         }
 
         return false
     }
-
 
     private fun showCrashActivity(crashInfo: PluginCrashInfo) {
         context.startPluginActivity(CrashActivity::class.java) {
@@ -180,9 +192,6 @@ class PluginCrashHandler private constructor(
         exitProcess(10)
     }
 
-    /**
-     * 通过分析堆栈轨迹，找到第一个属于插件的类，从而定位肇事插件ID
-     */
     private fun findCulpritPluginId(throwable: Throwable?): String? {
         var current: Throwable? = throwable
         while (current != null) {

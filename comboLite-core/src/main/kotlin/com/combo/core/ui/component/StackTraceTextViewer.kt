@@ -107,9 +107,9 @@ fun StackTraceTextViewer(
     onTextLayout: (TextLayoutResult) -> Unit = {}
 ) {
     val annotatedString = buildAnnotatedString {
-        val lineRegex = """^\s*(at\s+)?(([\w\.\$<>]+)\.)?([\w\$<>]+)\.([\w\$<>]+)(\((.*\.kt|.*\.java)?:(\d+)?\))?$""".toRegex()
-        val exceptionRegex = """^([\w\.\$]+(?:Exception|Error)):?(.*)?""".toRegex()
-        val causedByRegex = """^Caused by: ([\w\.\$]+(?:Exception|Error)):?(.*)?""".toRegex()
+        val lineRegex = """^\s*(at\s+)?(([\w.$<>]+)\.)?([\w$<>]+)\.([\w$<>]+)(\((.*\.kt|.*\.java)?:(\d+)?\))?$""".toRegex()
+        val exceptionRegex = """^([\w.$]+(?:Exception|Error)):?(.*)?""".toRegex()
+        val causedByRegex = """^Caused by: ([\w.$]+(?:Exception|Error)):?(.*)?""".toRegex()
 
         stackTrace.lines().forEach { line ->
             var matched = false

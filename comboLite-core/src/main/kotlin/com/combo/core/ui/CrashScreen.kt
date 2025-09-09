@@ -71,7 +71,7 @@ fun CrashScreen(
     onRestartApp: (disablePlugin: Boolean) -> Unit
 ) {
     var disablePlugin by remember { mutableStateOf(true) }
-    var detailsExpanded by remember { mutableStateOf(false) }
+    var detailsExpanded by remember { mutableStateOf(true) }
     val interactionSource = remember { MutableInteractionSource() }
 
     AppTheme {
@@ -140,7 +140,7 @@ fun CrashScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "异常日志",
+                            text = "错误日志",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -148,7 +148,7 @@ fun CrashScreen(
                             imageVector = Icons.Rounded.ArrowDropDown,
                             contentDescription = "展开/收起",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.graphicsLayer(rotationZ = if (detailsExpanded) 180f else 0f)
+                            modifier = Modifier.graphicsLayer(rotationZ = if (detailsExpanded) 0f else 180f)
                         )
                     }
 
@@ -217,7 +217,7 @@ fun CrashScreen(
                         text = if (disablePlugin && (crashInfo.culpritPluginId != null && crashInfo.culpritPluginId != "未知")) "禁用并重启" else "重启应用"
                     )
                 }
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
