@@ -50,12 +50,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.combo.core.runtime.PluginManager
 import com.combo.core.model.AuthorizationRequest
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_API_METHOD_NAME
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_PERMISSION_LEVEL
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_NAME
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_TARGET_PLUGIN_ID
+import com.combo.core.runtime.PluginManager
 import com.combo.core.runtime.installer.InstallerManager
 import com.combo.core.security.auth.AuthorizationManager
 import com.combo.core.security.crash.PluginCrashHandler
@@ -63,7 +63,7 @@ import com.combo.core.security.permission.PermissionLevel
 import com.combo.core.ui.component.InfoRow
 import com.combo.core.ui.component.PrimaryButton
 import com.combo.core.ui.component.SecondaryButton
-import com.combo.core.ui.theme.AppTheme
+import com.combo.core.ui.theme.FrameworkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +80,7 @@ fun ApiPermissionScreen(
 
     val purpose = getPurposeFromApiName(apiMethodName)
 
-    AppTheme {
+    FrameworkTheme {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -193,7 +193,7 @@ fun ApiPermissionScreen(
                         Text(
                             text = purpose,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
 
@@ -230,19 +230,40 @@ fun ApiPermissionScreen(
  */
 private fun getPurposeFromApiName(apiName: String): String {
     return when (apiName) {
-        PluginManager::launchPlugin.name -> "加载或重新启动一个插件。此操作可能会激活插件功能，或因重启中断该插件正在进行的服务。"
-        PluginManager::unloadPlugin.name -> "立即停止一个已加载的插件。如果其他插件正依赖于它，可能会导致它们功能异常或崩溃。"
-        PluginManager::loadEnabledPlugins.name -> "加载所有被标记为'已启用'的插件。这是一个全局性的批量操作，通常在应用启动时执行。"
-        PluginManager::setPluginEnabled.name -> "设置目标插件是否在应用下次启动时自动加载。禁用插件可以防止应用在下次启动时自动运行该插件。"
-        InstallerManager::installPlugin.name -> "从APK文件安装一个新插件或更新一个现有插件。此操作将在应用中引入新的代码和功能，具有高风险。"
-        InstallerManager::uninstallPlugin.name -> "从本应用中永久性地卸载移除一个插件及其所有相关数据。这是一个不可恢复的操作。"
-        PluginCrashHandler::setGlobalClashCallback.name -> "注册一个全局的插件崩溃回调。这会改变应用处理插件错误的方式，可能被用于日志记录、自定义恢复逻辑，或拦截错误信息。"
-        AuthorizationManager::setAuthorizationHandler.name -> "替换框架默认的授权处理器。这将改变未来所有权限请求的界面和处理逻辑，是一项高度敏感的核心安全操作。"
-        PluginManager::setValidationStrategy.name -> "修改插件安装时的签名验证策略。改变此策略会直接影响整个应用的安全模型。"
-        else -> "执行一项未在描述列表中指定的敏感操作，请谨慎处理。"
+        PluginManager::launchPlugin.name ->
+            "请求加载或重启一个插件。此操作会立即执行插件代码，激活其功能。如果该插件正在运行，重启会中断其当前服务。"
+
+        PluginManager::unloadPlugin.name ->
+            "请求立即停止并卸载一个正在运行的插件。如果其他插件正依赖于它，此操作可能导致它们功能异常或崩溃。"
+
+        PluginManager::loadEnabledPlugins.name ->
+            "请求加载所有已安装且被启用的插件。这是一个全局批量操作，通常在应用启动时执行，用于恢复工作环境。"
+
+        PluginManager::setPluginEnabled.name ->
+            "修改目标插件的启用状态。被禁用的插件在应用下次启动时将不会自动加载，这可以用于临时隔离有问题的插件。"
+
+        InstallerManager::installPlugin.name ->
+            "请求安装或更新一个插件。此操作将在应用中引入新的可执行代码，是最高风险的操作之一，请仅在信任插件来源时授权。"
+
+        InstallerManager::uninstallPlugin.name ->
+            "请求永久卸载一个插件及其所有数据。这是一个不可恢复的操作，插件提供的所有功能都将消失。"
+
+        PluginManager::setValidationStrategy.name ->
+            "修改插件安装时的签名验证策略。降低安全等级（如允许任意签名）将使应用面临被恶意插件攻击的风险，直接影响应用的安全根基。"
+
+        PluginCrashHandler::setGlobalClashCallback.name ->
+            "修改全局插件崩溃处理逻辑。这是一个核心安全设置，错误的实现可能导致应用无法从插件崩溃中恢复，或被用于隐藏恶意行为。"
+
+        PluginCrashHandler::setClashCallback.name ->
+            "为插件自身注册一个专属的崩溃回调。这允许插件自定义其部分异常的处理方式，例如进行特定的数据清理或上报。"
+
+        AuthorizationManager::setAuthorizationHandler.name ->
+            "替换框架默认的授权管理器。这将改变未来所有敏感操作（如安装、API调用）的授权界面和逻辑，是一项最高级别的安全设置。"
+
+        else ->
+            "执行一项未在描述列表中指定的敏感操作，请谨慎处理。"
     }
 }
-
 
 @Preview(showBackground = true, name = "HOST Permission Light")
 @Composable
@@ -258,22 +279,4 @@ fun ApiPermissionScreenHostLightPreview() {
         )
     )
     ApiPermissionScreen(request = request, onResult = {}, onExit = {})
-}
-
-@Preview(showBackground = true, name = "SELF Permission Dark")
-@Composable
-fun ApiPermissionScreenSelfDarkPreview() {
-    AppTheme(darkTheme = true) {
-        val request = AuthorizationRequest(
-            type = AuthorizationRequest.RequestType.API_PERMISSION,
-            callingPluginId = "com.plugin.downloader",
-            details = mapOf(
-                KEY_PLUGIN_NAME to "下载器",
-                KEY_API_METHOD_NAME to "uninstallPlugin",
-                KEY_PERMISSION_LEVEL to "SELF",
-                KEY_TARGET_PLUGIN_ID to "com.plugin.downloader"
-            )
-        )
-        ApiPermissionScreen(request = request, onResult = {}, onExit = {})
-    }
 }

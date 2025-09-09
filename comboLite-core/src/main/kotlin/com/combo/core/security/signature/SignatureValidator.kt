@@ -36,7 +36,6 @@ internal object SignatureValidator {
 
     private const val TAG = "SignatureValidator"
 
-    // 缓存宿主的完整签名对象，避免重复查询PackageManager
     @Volatile
     private var hostSignaturesCache: Set<Signature>? = null
 

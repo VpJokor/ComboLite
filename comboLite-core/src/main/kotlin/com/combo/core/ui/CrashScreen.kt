@@ -62,7 +62,7 @@ import com.combo.core.ui.component.InfoRow
 import com.combo.core.ui.component.PrimaryButton
 import com.combo.core.ui.component.SecondaryButton
 import com.combo.core.ui.component.StackTraceTextViewer
-import com.combo.core.ui.theme.AppTheme
+import com.combo.core.ui.theme.FrameworkTheme
 
 @Composable
 fun CrashScreen(
@@ -74,7 +74,7 @@ fun CrashScreen(
     var detailsExpanded by remember { mutableStateOf(true) }
     val interactionSource = remember { MutableInteractionSource() }
 
-    AppTheme {
+    FrameworkTheme {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
@@ -148,7 +148,7 @@ fun CrashScreen(
                             imageVector = Icons.Rounded.ArrowDropDown,
                             contentDescription = "展开/收起",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.graphicsLayer(rotationZ = if (detailsExpanded) 0f else 180f)
+                            modifier = Modifier.graphicsLayer(rotationZ = if (detailsExpanded) 180f else 0f)
                         )
                     }
 
@@ -193,7 +193,7 @@ fun CrashScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "禁用此插件以防再次出错",
+                            text = "禁用此可能导致应用异常的插件",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )

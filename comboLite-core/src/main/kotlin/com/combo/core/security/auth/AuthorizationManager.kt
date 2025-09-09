@@ -68,13 +68,11 @@ class AuthorizationManager(
             return true
         }
 
-        // 步骤 2: 检查是否为硬性失败
         if (hardFail) {
             Timber.w("授权拒绝 (硬性失败): ${request.type} from ${request.callingPluginId}")
             return false
         }
 
-        // 步骤 3: 静态检查失败且非硬性失败，进入用户授权流程
         Timber.i("静态权限检查未通过，正在向用户请求授权: ${request.type} from ${request.callingPluginId}")
         return authorizationHandler.onAuthorizationRequest(request)
     }

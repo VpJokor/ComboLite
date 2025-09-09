@@ -17,6 +17,7 @@
 package com.combo.core.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Info
@@ -56,7 +56,7 @@ import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_VERSION
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_SIGNATURE_HASH
 import com.combo.core.ui.component.InfoRowStyled
 import com.combo.core.ui.component.PrimaryButton
-import com.combo.core.ui.theme.AppTheme
+import com.combo.core.ui.theme.FrameworkTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,9 +69,9 @@ fun InstallPermissionScreen(
     val pluginName = details[KEY_PLUGIN_NAME] ?: request.callingPluginId
     val pluginVersion = details[KEY_PLUGIN_VERSION] ?: "未知版本"
     val pluginDescription = (details[KEY_PLUGIN_DESCRIPTION] ?: "无").ifBlank { "无" }
-    val signature = details[KEY_SIGNATURE_HASH]?.chunked(16)?.joinToString("\n") ?: "未知"
+    val signature = details[KEY_SIGNATURE_HASH] ?: "未知"
 
-    AppTheme {
+    FrameworkTheme {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -99,7 +99,6 @@ fun InstallPermissionScreen(
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. 插件图标和名称
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -124,39 +123,42 @@ fun InstallPermissionScreen(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-                // 2. 警告信息
+
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalAlignment = Alignment.Top,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 24.dp)
+                        .background(
+                            MaterialTheme.colorScheme.tertiaryContainer,
+                            RoundedCornerShape(10.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Icon(
+                        modifier = Modifier.size(20.dp),
                         imageVector = Icons.Rounded.Info,
                         contentDescription = "Warning",
                         tint = MaterialTheme.colorScheme.tertiary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "未知插件安装",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = "该插件的数字签名与本应用不一致，可能存在未知风险，是否继续安装？",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.tertiary
                     )
                 }
 
-                // 3. 详细信息 (允许复制)
-                SelectionContainer {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        InfoRowStyled("插件 ID", request.callingPluginId)
-                        InfoRowStyled("描述", pluginDescription)
-                        InfoRowStyled("签名指纹", signature)
-                    }
-                }
+                Spacer(modifier = Modifier.height(24.dp))
 
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    InfoRowStyled("插件 ID", request.callingPluginId)
+                    InfoRowStyled("描述", pluginDescription)
+                    InfoRowStyled("数字签名 (SHA-256)", signature)
+                }
 
                 Spacer(modifier = Modifier.weight(1f))
 
@@ -191,22 +193,4 @@ fun InstallPermissionScreenLightPreview() {
         )
     )
     InstallPermissionScreen(request = request, onResult = {}, onExit = {})
-}
-
-@Preview(showBackground = true, name = "Install Permission Dark")
-@Composable
-fun InstallPermissionScreenDarkPreview() {
-    AppTheme(darkTheme = true) {
-        val request = AuthorizationRequest(
-            type = AuthorizationRequest.RequestType.INSTALL_PERMISSION,
-            callingPluginId = "com.example.beautify",
-            details = mapOf(
-                KEY_PLUGIN_NAME to "美化工具",
-                KEY_PLUGIN_VERSION to "2.1.0",
-                KEY_PLUGIN_DESCRIPTION to "一款强大的界面美化工具，提供多种主题和自定义选项。",
-                KEY_SIGNATURE_HASH to "SHA256:8F:E9:B3:D2:A7:C8:E4:F5:1A:B2:D3:E6:7F:8C:9A:0B"
-            )
-        )
-        InstallPermissionScreen(request = request, onResult = {}, onExit = {})
-    }
 }
