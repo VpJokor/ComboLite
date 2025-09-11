@@ -45,7 +45,7 @@ class PluginUpdateViewModel(
     private fun fetchPlugins() {
         viewModelScope.launch {
             updateState { copy(isLoading = true) }
-            val installed = PluginManager.getAllInstallPlugins().associate { it.pluginId to it.version }
+            val installed = PluginManager.getAllInstallPlugins().associate { it.id to it.versionName }
             val remote = updateManager.fetchRemotePlugins()
             updateState {
                 copy(
@@ -109,10 +109,10 @@ class PluginUpdateViewModel(
 
         when (result) {
             is InstallerManager.InstallResult.Success -> {
-                PluginManager.launchPlugin(result.pluginInfo.pluginId)
+                PluginManager.launchPlugin(result.pluginInfo.id)
 
                 updateState {
-                    copy(installedPlugins = installedPlugins + (result.pluginInfo.pluginId to result.pluginInfo.version))
+                    copy(installedPlugins = installedPlugins + (result.pluginInfo.id to result.pluginInfo.versionName))
                 }
 
                 if (wasPreviouslyInstalled) {

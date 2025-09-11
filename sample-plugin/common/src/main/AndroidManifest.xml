@@ -16,12 +16,12 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.combo.plugin.sample.common"
-    android:versionCode="1"
+    android:versionCode="2"
     android:versionName="1.0.1">
 
     <application
-        android:label="公共模块插件"
-        android:icon="@mipmap/plugin_icon">
+        android:label="公共模块"
+        android:icon="@drawable/ic_icon">
 
         <meta-data
             android:name="plugin.entryClass"

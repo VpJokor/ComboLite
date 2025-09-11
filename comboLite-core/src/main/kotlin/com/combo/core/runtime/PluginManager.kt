@@ -111,6 +111,9 @@ object PluginManager {
         return frameworkContext ?: throw IllegalStateException("PluginManager has not been initialized.")
     }
 
+    // 用于存储源码调试模式下的插件信息
+    private val debugPlugins = mutableMapOf<String, Class<out IPluginEntryClass>>()
+
     /**
      * 初始化插件管理器。
      */
@@ -164,6 +167,22 @@ object PluginManager {
         requireContext().validationStrategy = strategy
         Timber.i("PluginManager: ValidationStrategy 已更新为: ${strategy::class.java.simpleName}")
     }
+
+    /**
+     * (仅供Debug模式使用) 注册一个以源码形式依赖的插件。
+     * 这个方法应该在 Application.onCreate() 中，PluginManager.initialize() 之前调用。
+     *
+     * @param pluginId 插件的包名 (ID)。
+     * @param entryClass 插件的入口类 IPluginEntryClass 的 Class 对象。
+     */
+    fun registerDebugPlugin(pluginId: String, entryClass: Class<out IPluginEntryClass>) {
+        if (debugPlugins.containsKey(pluginId)) {
+            Timber.tag(TAG).w("重复注册调试插件: $pluginId")
+            return
+        }
+        debugPlugins[pluginId] = entryClass
+    }
+
 
     // --- API 转发层 ---
 

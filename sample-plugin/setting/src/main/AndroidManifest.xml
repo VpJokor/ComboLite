@@ -14,16 +14,14 @@
   ~ limitations under the License.
   -->
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.combo.plugin.sample.setting"
+    android:versionCode="2"
+    android:versionName="1.0.1">
 
-    <application>
-        <!-- 插件配置元数据 -->
-        <meta-data
-            android:name="plugin.id"
-            android:value="setting" />
-        <meta-data
-            android:name="plugin.version"
-            android:value="1.0.0" />
+    <application
+        android:label="设置中心"
+        android:icon="@drawable/plugin_icon">
         <meta-data
             android:name="plugin.description"
             android:value="设置模块插件，加载所有已安装的插件列表，负责管理所有插件相关设置，可以设置插件启用状态、手动开启/关闭插件、卸载插件" />

@@ -114,14 +114,6 @@
         </activity>
 
         <meta-data
-            android:name="plugin.id"
-            tools:node="remove" />
-
-        <meta-data
-            android:name="plugin.version"
-            tools:node="remove" />
-
-        <meta-data
             android:name="plugin.description"
             tools:node="remove" />
 

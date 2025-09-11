@@ -14,16 +14,14 @@
   ~ limitations under the License.
   -->
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.combo.plugin.sample.home"
+    android:versionCode="2"
+    android:versionName="1.0.1">
 
-    <application>
-        <!-- 插件配置元数据 -->
-        <meta-data
-            android:name="plugin.id"
-            android:value="home" />
-        <meta-data
-            android:name="plugin.version"
-            android:value="1.0.0" />
+    <application
+        android:label="首页"
+        android:icon="@drawable/plugin_icon">
         <meta-data
             android:name="plugin.description"
             android:value="首页模块插件，提供宿主应用的首页页面，负责为guide、example、setting这三个插件模块切换导航" />

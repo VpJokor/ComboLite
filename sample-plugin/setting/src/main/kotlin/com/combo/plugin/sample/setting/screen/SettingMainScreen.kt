@@ -95,26 +95,26 @@ fun SettingMainScreen(
                 }
 
                 // 插件列表
-                items(state.installedPlugins, key = { it.pluginId }) { plugin ->
-                    val isRunning = loadedPlugins.containsKey(plugin.pluginId)
+                items(state.installedPlugins, key = { it.id }) { plugin ->
+                    val isRunning = loadedPlugins.containsKey(plugin.id)
                     PluginCard(
                         plugin = plugin,
                         isRunning = isRunning,
                         onEnableChange = { isEnabled ->
-                            viewModel.setPluginEnabled(plugin.pluginId, isEnabled)
+                            viewModel.setPluginEnabled(plugin.id, isEnabled)
                         },
                         onLaunch = {
                             viewModel.viewModelScope.launch {
-                                PluginManager.launchPlugin(plugin.pluginId)
+                                PluginManager.launchPlugin(plugin.id)
                             }
                         },
                         onClose = {
                             viewModel.viewModelScope.launch {
-                                PluginManager.unloadPlugin(plugin.pluginId)
+                                PluginManager.unloadPlugin(plugin.id)
                             }
                         },
                         onUninstall = {
-                            viewModel.uninstallPlugin(plugin.pluginId)
+                            viewModel.uninstallPlugin(plugin.id)
                         }
                     )
                 }

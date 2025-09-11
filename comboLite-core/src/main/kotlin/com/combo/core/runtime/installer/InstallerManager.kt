@@ -75,7 +75,7 @@ class InstallerManager(
     /**
      * 从插件 `AndroidManifest.xml` 中解析出的核心配置信息。
      *
-     * @property pluginId 插件的唯一标识符。
+     * @property id 插件的唯一标识符。
      * @property name 插件的名称。
      * @property iconResId 插件的图标资源ID。
      * @property pluginDescription 插件的功能描述。
@@ -85,7 +85,7 @@ class InstallerManager(
      */
     @Serializable
     data class PluginConfig(
-        val pluginId: String,
+        val id: String,
         val name: String,
         val iconResId: Int, // [MODIFIED]
         val pluginDescription: String,
@@ -152,7 +152,7 @@ class InstallerManager(
             return@withContext InstallResult.Failure(validationResult.reason)
         }
 
-        val pluginId = pluginConfig.pluginId
+        val pluginId = pluginConfig.id
         val pluginDir = getPluginDirectory(pluginId)
 
         // 步骤 4: 版本检查
@@ -209,7 +209,7 @@ class InstallerManager(
 
             // 步骤 8: 更新 plugins.xml
             val pluginInfo = PluginInfo(
-                pluginId = pluginConfig.pluginId,
+                id = pluginConfig.id,
                 name = pluginConfig.name,
                 iconResId = pluginConfig.iconResId,
                 description = pluginConfig.pluginDescription,
@@ -431,20 +431,20 @@ class InstallerManager(
                 @Suppress("DEPRECATION")
                 packageInfo.versionCode.toLong()
             }
-            val versionName = packageInfo.versionName ?: "0.0.0" // 提供默认值
+            val versionName = packageInfo.versionName ?: "0.0.0"
             val name = pm.getApplicationLabel(appInfo).toString()
             val iconResId = appInfo.icon
 
             val entryClass = metaData.getString(META_PLUGIN_ENTRY_CLASS)
             val pluginDescription = metaData.getString(META_PLUGIN_DESCRIPTION) ?: ""
 
-            if (pluginId.isNullOrBlank() || entryClass.isNullOrBlank()) {
+            if (pluginId.isBlank() || entryClass.isNullOrBlank()) {
                 Timber.tag(TAG).e("核心元数据 (package, entryClass) 不能为空。")
                 return null
             }
 
             val pluginConfig = PluginConfig(
-                pluginId = pluginId,
+                id = pluginId,
                 name = name,
                 iconResId = iconResId,
                 pluginDescription = pluginDescription,
@@ -453,7 +453,7 @@ class InstallerManager(
                 entryClass = entryClass
             )
 
-            Timber.tag(TAG).d("插件元数据配置验证通过: ${pluginConfig.pluginId}")
+            Timber.tag(TAG).d("插件元数据配置验证通过: ${pluginConfig.id}")
             return pluginConfig
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "解析插件元数据配置失败: ${e.message}")
@@ -719,7 +719,7 @@ class InstallerManager(
                     ValidationResult(true)
                 } else {
                     val request = AuthorizationRequest.forInstall(
-                        pluginId = pluginConfig.pluginId,
+                        pluginId = pluginConfig.id,
                         name = pluginConfig.name,
                         iconResId = pluginConfig.iconResId,
                         description = pluginConfig.pluginDescription,

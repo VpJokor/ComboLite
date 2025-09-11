@@ -95,7 +95,7 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
     suspend fun loadEnabledPlugins(): Int = withContext(Dispatchers.IO) {
         Timber.Forest.tag(TAG).i("开始异步初始化所有已启用的插件。")
         val enabledPlugins =
-            getEnabledPlugins().filter { !context.loadedPlugins.value.containsKey(it.pluginId) }
+            getEnabledPlugins().filter { !context.loadedPlugins.value.containsKey(it.id) }
 
         if (enabledPlugins.isEmpty()) {
             Timber.Forest.tag(TAG).i("没有新的已启用插件需要加载。")
@@ -162,22 +162,22 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
                 loadedPluginsList = loadJobs.awaitAll().filterNotNull()
                 if (loadedPluginsList.size != pluginsToLoad.size) {
                     Timber.Forest.tag(TAG).w("部分插件加载失败，操作中止。")
-                    loadedPluginsList.forEach { unloadPlugin(it.pluginInfo.pluginId) }
+                    loadedPluginsList.forEach { unloadPlugin(it.pluginInfo.id) }
                     return@coroutineScope false
                 }
 
-                context.loadedPlugins.update { it + loadedPluginsList.associateBy { p -> p.pluginInfo.pluginId } }
+                context.loadedPlugins.update { it + loadedPluginsList.associateBy { p -> p.pluginInfo.id } }
                 Timber.Forest.tag(TAG).d("成功注册 ${loadedPluginsList.size} 个插件的加载信息。")
 
                 val instantiateJobs = loadedPluginsList.map { loadedPlugin ->
                     async(Dispatchers.Default) {
-                        instantiatePlugin(loadedPlugin)?.let { it1 -> loadedPlugin.pluginInfo.pluginId to it1 }
+                        instantiatePlugin(loadedPlugin)?.let { it1 -> loadedPlugin.pluginInfo.id to it1 }
                     }
                 }
                 val successfulInstances = instantiateJobs.awaitAll().filterNotNull().toMap()
                 if (successfulInstances.size != pluginsToLoad.size) {
                     Timber.Forest.tag(TAG).e("部分插件实例化失败，执行回滚...")
-                    loadedPluginsList.forEach { unloadPlugin(it.pluginInfo.pluginId) }
+                    loadedPluginsList.forEach { unloadPlugin(it.pluginInfo.id) }
                     return@coroutineScope false
                 }
 
@@ -187,7 +187,7 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
                 true
             } catch (e: Throwable) {
                 Timber.Forest.tag(TAG).e(e, "批量加载插件时发生严重错误，执行回滚...")
-                loadedPluginsList?.forEach { unloadPlugin(it.pluginInfo.pluginId) }
+                loadedPluginsList?.forEach { unloadPlugin(it.pluginInfo.id) }
                 false
             }
         }
@@ -204,22 +204,22 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
                 loadClassIndexForPlugin(plugin)
 
                 context.proxyManager.registerStaticReceivers(
-                    plugin.pluginId,
+                    plugin.id,
                     plugin.staticReceivers.filter { it.enabled })
                 context.proxyManager.registerProviders(
-                    plugin.pluginId,
+                    plugin.id,
                     plugin.providers.filter { it.enabled })
 
-                val pluginInstallDir = context.installerManager.getPluginDirectory(plugin.pluginId)
+                val pluginInstallDir = context.installerManager.getPluginDirectory(plugin.id)
                 val abi = Build.SUPPORTED_ABIS[0]
                 val nativeLibDir = File(pluginInstallDir, "lib/$abi")
                 val nativeLibraryPath =
                     if (nativeLibDir.exists()) nativeLibDir.absolutePath else null
                 val optimizedDirectory =
-                    context.installerManager.getOptimizedDirectory(plugin.pluginId)?.absolutePath
+                    context.installerManager.getOptimizedDirectory(plugin.id)?.absolutePath
 
                 val classLoader = PluginClassLoader(
-                    pluginId = plugin.pluginId,
+                    pluginId = plugin.id,
                     pluginFile = pluginApkFile,
                     parent = context.application.classLoader,
                     optimizedDirectory = optimizedDirectory,
@@ -227,10 +227,10 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
                     pluginFinder = context.dependencyManager,
                 )
 
-                context.resourcesManager.loadPluginResources(plugin.pluginId, pluginApkFile)
+                context.resourcesManager.loadPluginResources(plugin.id, pluginApkFile)
                 LoadedPluginInfo(pluginInfo = plugin, classLoader = classLoader)
             } catch (e: Exception) {
-                Timber.Forest.tag(TAG).e(e, "加载插件 ${plugin.pluginId} 失败: ${e.message}")
+                Timber.Forest.tag(TAG).e(e, "加载插件 ${plugin.id} 失败: ${e.message}")
                 null
             }
         }
@@ -240,16 +240,16 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
         return try {
             val instance = loadedPlugin.classLoader.getInterface(IPluginEntryClass::class.java, plugin.entryClass)
             if (instance != null) {
-                Timber.Forest.tag(TAG).d("插件入口类实例化成功: ${plugin.pluginId} -> ${plugin.entryClass}")
-                loadKoinModules(plugin.pluginId, instance)
+                Timber.Forest.tag(TAG).d("插件入口类实例化成功: ${plugin.id} -> ${plugin.entryClass}")
+                loadKoinModules(plugin.id, instance)
                 executeOnLoad(plugin, instance)
                 instance
             } else {
-                Timber.Forest.tag(TAG).e("插件入口类实例化失败: ${plugin.pluginId} -> ${plugin.entryClass}")
+                Timber.Forest.tag(TAG).e("插件入口类实例化失败: ${plugin.id} -> ${plugin.entryClass}")
                 null
             }
         } catch (e: Exception) {
-            Timber.Forest.tag(TAG).e(e, "实例化插件 ${plugin.pluginId} 入口类失败: ${e.message}")
+            Timber.Forest.tag(TAG).e(e, "实例化插件 ${plugin.id} 入口类失败: ${e.message}")
             null
         }
     }
@@ -268,9 +268,9 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
             val pluginContext =
                 PluginContext(application = context.application, pluginInfo = plugin)
             instance.onLoad(pluginContext)
-            Timber.Forest.tag(TAG).d("插件 [${plugin.pluginId}] onLoad() 执行成功。")
+            Timber.Forest.tag(TAG).d("插件 [${plugin.id}] onLoad() 执行成功。")
         } catch (e: Exception) {
-            Timber.Forest.tag(TAG).e(e, "插件 [${plugin.pluginId}] onLoad() 执行失败。")
+            Timber.Forest.tag(TAG).e(e, "插件 [${plugin.id}] onLoad() 执行失败。")
         }
     }
 
@@ -308,7 +308,7 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
     }
 
     private fun loadClassIndexForPlugin(plugin: PluginInfo) {
-        val pluginDir = context.installerManager.getPluginDirectory(plugin.pluginId)
+        val pluginDir = context.installerManager.getPluginDirectory(plugin.id)
         val indexFile = File(pluginDir, "class_index")
         var loadedCount = 0
 
@@ -320,11 +320,11 @@ internal class PluginLifecycleManager(private val context: PluginFrameworkContex
         try {
             indexFile.forEachLine { className ->
                 if (className.isNotBlank()) {
-                    context.classIndex[className] = plugin.pluginId
+                    context.classIndex[className] = plugin.id
                     loadedCount++
                 }
             }
-            Timber.Forest.tag(CLASS_INDEX_TAG).d("为插件 [${plugin.pluginId}] 从文件加载了 $loadedCount 个类索引。")
+            Timber.Forest.tag(CLASS_INDEX_TAG).d("为插件 [${plugin.id}] 从文件加载了 $loadedCount 个类索引。")
         } catch (e: Exception) {
             Timber.Forest.tag(CLASS_INDEX_TAG).e(e, "从文件加载类索引失败: ${indexFile.absolutePath}")
         }

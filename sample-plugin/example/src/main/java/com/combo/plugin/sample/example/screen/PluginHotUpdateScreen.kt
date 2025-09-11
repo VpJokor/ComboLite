@@ -119,7 +119,7 @@ fun PluginHotUpdateScreen() {
             val installedPlugin = uiState.recentlyInstalledPlugin
             if (installedPlugin != null) {
                 InstallSuccessDialog(
-                    pluginName = installedPlugin.pluginId,
+                    pluginName = installedPlugin.id,
                     onConfirm = { viewModel.restartApp() },
                     onDismiss = { viewModel.dismissRestartDialog() }
                 )

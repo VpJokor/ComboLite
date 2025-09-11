@@ -47,7 +47,7 @@ class PluginEntryClass : IPluginEntryClass {
         CoroutineScope(Dispatchers.IO).launch {
             // 设置插件崩溃处理回调
             PluginCrashHandler.setClashCallback(
-                context.pluginInfo.pluginId,
+                context.pluginInfo.id,
                 object : IPluginCrashCallback {
                     /**
                      * 当插件因 ClassCastException 崩溃时调用。

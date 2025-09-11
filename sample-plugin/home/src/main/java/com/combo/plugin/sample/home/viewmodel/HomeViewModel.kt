@@ -34,9 +34,9 @@ class HomeViewModel(
     initialState = HomeState()
 ) {
     companion object {
-        const val PLUGIN_GUIDE = "guide"
-        const val PLUGIN_EXAMPLE = "example"
-        const val PLUGIN_SETTING = "setting"
+        const val PLUGIN_GUIDE = "com.combo.plugin.sample.guide"
+        const val PLUGIN_EXAMPLE = "com.combo.plugin.sample.example"
+        const val PLUGIN_SETTING = "com.combo.plugin.sample.setting"
     }
 
     init {
@@ -144,7 +144,7 @@ class HomeViewModel(
      */
     fun getPluginStatus(pluginId: String): PluginStatus {
         // 检查插件是否已安装
-        val isInstalled = uiState.value.installedPlugins.any { it.pluginId == pluginId }
+        val isInstalled = uiState.value.installedPlugins.any { it.id == pluginId }
 
         if (!isInstalled) {
             return PluginStatus.NOT_INSTALLED

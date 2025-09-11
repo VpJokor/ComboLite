@@ -180,7 +180,7 @@ class XmlManager(
                     val plugins = loadPluginsFromDisk()
                     pluginCache.clear()
                     plugins.forEach { plugin ->
-                        pluginCache[plugin.pluginId] = plugin
+                        pluginCache[plugin.id] = plugin
                     }
                     cacheInitialized = true
                     hasUnsavedChanges.set(false)
@@ -258,7 +258,7 @@ class XmlManager(
                                 TAG_PLUGIN ->
                                     currentPlugin =
                                         PluginInfo(
-                                            pluginId = parser.getAttributeValue(null, ATTR_ID)
+                                            id = parser.getAttributeValue(null, ATTR_ID)
                                                 ?: "",
                                             name = parser.getAttributeValue(null, ATTR_NAME) ?: "",
                                             iconResId = parser.getAttributeValue(null, ATTR_ICON_RES_ID)
@@ -449,7 +449,7 @@ class XmlManager(
                 val plugins = loadPluginsFromDisk(useBackup = true)
                 pluginCache.clear()
                 plugins.forEach { plugin ->
-                    pluginCache[plugin.pluginId] = plugin
+                    pluginCache[plugin.id] = plugin
                 }
                 cacheInitialized = true
                 hasUnsavedChanges.set(true) // 标记需要重新保存主文件
@@ -495,7 +495,7 @@ class XmlManager(
 
                 plugins.forEach { plugin ->
                     serializer.startTag(null, TAG_PLUGIN)
-                    serializer.attribute(null, ATTR_ID, plugin.pluginId)
+                    serializer.attribute(null, ATTR_ID, plugin.id)
                     serializer.attribute(null, ATTR_NAME, plugin.name)
                     serializer.attribute(null, ATTR_ICON_RES_ID, plugin.iconResId.toString())
                     serializer.attribute(null, ATTR_VERSION_CODE, plugin.versionCode.toString())
@@ -689,13 +689,13 @@ class XmlManager(
                 initializeCache()
             }
 
-            if (pluginCache.containsKey(plugin.pluginId)) {
-                throw IllegalArgumentException("Plugin with ID ${plugin.pluginId} already exists.")
+            if (pluginCache.containsKey(plugin.id)) {
+                throw IllegalArgumentException("Plugin with ID ${plugin.id} already exists.")
             }
 
-            pluginCache[plugin.pluginId] = plugin
+            pluginCache[plugin.id] = plugin
             scheduleDelayedWrite()
-            Timber.tag(TAG).d("插件信息已添加: ${plugin.pluginId}")
+            Timber.tag(TAG).d("插件信息已添加: ${plugin.id}")
         }
     }
 
@@ -710,13 +710,13 @@ class XmlManager(
                 initializeCache()
             }
 
-            if (!pluginCache.containsKey(plugin.pluginId)) {
-                throw NoSuchElementException("Plugin with ID ${plugin.pluginId} not found for update.")
+            if (!pluginCache.containsKey(plugin.id)) {
+                throw NoSuchElementException("Plugin with ID ${plugin.id} not found for update.")
             }
 
-            pluginCache[plugin.pluginId] = plugin
+            pluginCache[plugin.id] = plugin
             scheduleDelayedWrite()
-            Timber.tag(TAG).d("插件信息已更新: ${plugin.pluginId}")
+            Timber.tag(TAG).d("插件信息已更新: ${plugin.id}")
         }
     }
 

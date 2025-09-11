@@ -58,8 +58,8 @@ class LoadingViewModel(
 
     companion object {
         const val BASE_PATH = "plugins"
-        const val PLUGIN_COMMON = "common"
-        const val PLUGIN_HOME = "home"
+        const val PLUGIN_COMMON = "com.combo.plugin.sample.common"
+        const val PLUGIN_HOME = "com.combo.plugin.sample.home"
     }
 
     init {
@@ -132,7 +132,7 @@ class LoadingViewModel(
      */
     fun getPluginStatus(pluginId: String): PluginStatus {
         // 检查插件是否已安装
-        val isInstalled = PluginManager.getAllInstallPlugins().any { it.pluginId == pluginId }
+        val isInstalled = PluginManager.getAllInstallPlugins().any { it.id == pluginId }
 
         if (!isInstalled) {
             return PluginStatus.NOT_INSTALLED

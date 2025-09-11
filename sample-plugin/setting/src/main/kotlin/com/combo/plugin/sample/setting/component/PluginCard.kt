@@ -85,8 +85,8 @@ fun PluginCard(
     var menuExpanded by remember { mutableStateOf(false) }
     var showCloseWarningDialog by remember { mutableStateOf(false) }
 
-    val dependents = remember(plugin.pluginId) {
-        PluginManager.getPluginDependentsChain(plugin.pluginId)
+    val dependents = remember(plugin.id) {
+        PluginManager.getPluginDependentsChain(plugin.id)
     }
 
     if (showCloseWarningDialog) {
@@ -128,11 +128,10 @@ fun PluginCard(
                     // 插件ID和自启动开关
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = plugin.pluginId,
+                            text = plugin.name,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
-                            //省略中间部分
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
 
@@ -207,16 +206,23 @@ fun PluginCard(
 
             // --- 详情区 (Content)，带动画效果 ---
             AnimatedVisibility(visible = expanded) {
-                Column {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
                     Text(
-                        text = plugin.description,
+                        text = "ID: ${plugin.id}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "描述: ${plugin.description}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "版本: ${plugin.version}",
+                        text = "版本: ${plugin.versionName}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.End)

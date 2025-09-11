@@ -15,9 +15,15 @@
   -->
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.combo.plugin.sample.example"
+    android:versionCode="3"
+    android:versionName="1.0.2">
 
-    <application>
+    <application
+        android:label="功能示例"
+        android:icon="@drawable/plugin_icon">
+
         <provider
             android:name=".provider.BookProvider"
             android:authorities="com.combo.plugin.sample.example.provider.books"
@@ -49,12 +55,7 @@
                 <data android:scheme="package" />
             </intent-filter>
         </receiver>
-        <meta-data
-            android:name="plugin.id"
-            android:value="example" />
-        <meta-data
-            android:name="plugin.version"
-            android:value="1.0.2" />
+
         <meta-data
             android:name="plugin.description"
             android:value="示例模块插件，提供了ComboLite插件化框架的各种基础使用示例" />

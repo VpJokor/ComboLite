@@ -80,7 +80,7 @@ fun ApiPermissionScreen(
 ) {
     val details = request.details
     val callingPluginInfo = remember(request.callingPluginId) {
-        PluginManager.getAllInstallPlugins().find { it.pluginId == request.callingPluginId }
+        PluginManager.getAllInstallPlugins().find { it.id == request.callingPluginId }
     }
     val pluginName = callingPluginInfo?.name ?: request.callingPluginId
 
@@ -104,7 +104,7 @@ fun ApiPermissionScreen(
                 ResourcesCompat.getDrawable(pluginRes, callingPluginInfo.iconResId, null)
             }
         } catch (e: Exception) {
-            Timber.e(e, "从已安装插件加载图标失败: ${callingPluginInfo.pluginId}")
+            Timber.e(e, "从已安装插件加载图标失败: ${callingPluginInfo.id}")
             null
         }
     }

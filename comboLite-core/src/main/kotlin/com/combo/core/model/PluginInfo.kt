@@ -20,7 +20,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class PluginInfo(
-    val pluginId: String,
+    val id: String,
     val name: String,
     val iconResId: Int,
     val versionCode: Long,
