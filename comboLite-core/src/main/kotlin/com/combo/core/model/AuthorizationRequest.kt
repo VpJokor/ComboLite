@@ -43,11 +43,11 @@ data class AuthorizationRequest(
         const val KEY_API_METHOD_NAME = "apiMethodName"
 
         const val KEY_PLUGIN_NAME = "pluginName"
-        const val KEY_PLUGIN_ICON_URL = "pluginIconUrl"
-        const val KEY_PLUGIN_VERSION = "pluginVersion"
+        const val KEY_PLUGIN_ICON_RES_ID = "pluginIconResId"
+        const val KEY_PLUGIN_VERSION_NAME = "pluginVersionName"
         const val KEY_PLUGIN_DESCRIPTION = "pluginDescription"
         const val KEY_SIGNATURE_HASH = "signatureHash"
-
+        const val KEY_PLUGIN_APK_PATH = "pluginApkPath"
 
         fun forApi(
             callingPluginId: String,
@@ -67,19 +67,21 @@ data class AuthorizationRequest(
         fun forInstall(
             pluginId: String,
             signature: String,
-            version: String,
+            versionName: String,
             description: String,
             name: String,
-            iconUrl: String
+            iconResId: Int,
+            apkPath: String
         ) = AuthorizationRequest(
             type = RequestType.INSTALL_PERMISSION,
             callingPluginId = pluginId,
             details = mapOf(
                 KEY_PLUGIN_NAME to name,
-                KEY_PLUGIN_ICON_URL to iconUrl,
-                KEY_PLUGIN_VERSION to version,
+                KEY_PLUGIN_ICON_RES_ID to iconResId.toString(),
+                KEY_PLUGIN_VERSION_NAME to versionName,
                 KEY_PLUGIN_DESCRIPTION to description,
-                KEY_SIGNATURE_HASH to signature
+                KEY_SIGNATURE_HASH to signature,
+                KEY_PLUGIN_APK_PATH to apkPath
             )
         )
     }

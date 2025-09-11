@@ -14,21 +14,22 @@
   ~ limitations under the License.
   -->
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.combo.plugin.sample.common"
+    android:versionCode="1"
+    android:versionName="1.0.1">
 
-    <application>
-        <!-- 插件配置元数据 -->
-        <meta-data
-            android:name="plugin.id"
-            android:value="common" />
-        <meta-data
-            android:name="plugin.version"
-            android:value="1.0.0" />
-        <meta-data
-            android:name="plugin.description"
-            android:value="公共模块插件，提供各个插件的公共功能、资源，如BaseViewModel、ComposeNavigator导航、各种utils工具类等等" />
+    <application
+        android:label="公共模块插件"
+        android:icon="@mipmap/plugin_icon">
+
         <meta-data
             android:name="plugin.entryClass"
             android:value="com.combo.plugin.sample.common.PluginEntryClass" />
+
+        <meta-data
+            android:name="plugin.description"
+            android:value="公共模块插件，提供各个插件的公共功能、资源，如BaseViewModel、ComposeNavigator导航、各种utils工具类等等" />
+
     </application>
 </manifest>

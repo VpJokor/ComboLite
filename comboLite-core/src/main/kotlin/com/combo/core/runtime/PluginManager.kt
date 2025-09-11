@@ -80,7 +80,6 @@ object PluginManager {
     // 内部上下文，持有所有状态和管理器
     private var frameworkContext: PluginFrameworkContext? = null
 
-
     // 公开暴露给外部的属性，从 frameworkContext 获取
     val initStateFlow: StateFlow<InitState>
         get() = requireContext().initState

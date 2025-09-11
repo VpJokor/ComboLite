@@ -42,21 +42,28 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.drawable.toBitmap
 import com.combo.core.model.AuthorizationRequest
+import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_APK_PATH
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_DESCRIPTION
+import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_ICON_RES_ID
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_NAME
-import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_VERSION
+import com.combo.core.model.AuthorizationRequest.Companion.KEY_PLUGIN_VERSION_NAME
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_SIGNATURE_HASH
 import com.combo.core.ui.component.InfoRowStyled
 import com.combo.core.ui.component.PrimaryButton
 import com.combo.core.ui.theme.FrameworkTheme
+import timber.log.Timber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,9 +74,35 @@ fun InstallPermissionScreen(
 ) {
     val details = request.details
     val pluginName = details[KEY_PLUGIN_NAME] ?: request.callingPluginId
-    val pluginVersion = details[KEY_PLUGIN_VERSION] ?: "未知版本"
+    val pluginVersion = details[KEY_PLUGIN_VERSION_NAME] ?: "未知版本"
     val pluginDescription = (details[KEY_PLUGIN_DESCRIPTION] ?: "无").ifBlank { "无" }
     val signature = details[KEY_SIGNATURE_HASH] ?: "未知"
+
+    val context = LocalContext.current
+    val pluginIcon = remember(request) {
+        val apkPath = details[KEY_PLUGIN_APK_PATH]
+        val iconResId = details[KEY_PLUGIN_ICON_RES_ID]?.toIntOrNull() ?: 0
+        if (apkPath.isNullOrBlank() || iconResId == 0) {
+            return@remember null
+        }
+        try {
+            val pm = context.packageManager
+            val packageInfo = pm.getPackageArchiveInfo(apkPath, 0)
+
+            packageInfo?.applicationInfo?.let { appInfo ->
+                appInfo.sourceDir = apkPath
+                appInfo.publicSourceDir = apkPath
+
+                val pluginRes = pm.getResourcesForApplication(appInfo)
+                ResourcesCompat.getDrawable(pluginRes, iconResId, null)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "从 APK 路径加载图标失败: $apkPath")
+            null
+        }
+    }
+
+
 
     FrameworkTheme {
         Scaffold(
@@ -103,13 +136,23 @@ fun InstallPermissionScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(id = android.R.mipmap.sym_def_app_icon),
-                        contentDescription = "Plugin Icon",
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
+                    if (pluginIcon != null) {
+                        Image(
+                            bitmap = pluginIcon.toBitmap().asImageBitmap(),
+                            contentDescription = "Plugin Icon",
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = android.R.mipmap.sym_def_app_icon),
+                            contentDescription = "Default Plugin Icon",
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                        )
+                    }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(text = pluginName, style = MaterialTheme.typography.titleMedium, maxLines = 1)
@@ -177,20 +220,4 @@ fun InstallPermissionScreen(
             }
         }
     }
-}
-
-@Preview(showBackground = true, name = "Install Permission Light")
-@Composable
-fun InstallPermissionScreenLightPreview() {
-    val request = AuthorizationRequest(
-        type = AuthorizationRequest.RequestType.INSTALL_PERMISSION,
-        callingPluginId = "com.example.beautify",
-        details = mapOf(
-            KEY_PLUGIN_NAME to "美化工具",
-            KEY_PLUGIN_VERSION to "2.1.0",
-            KEY_PLUGIN_DESCRIPTION to "一款强大的界面美化工具，提供多种主题和自定义选项。",
-            KEY_SIGNATURE_HASH to "SHA256:8F:E9:B3:D2:A7:C8:E4:F5:1A:B2:D3:E6:7F:8C:9A:0B"
-        )
-    )
-    InstallPermissionScreen(request = request, onResult = {}, onExit = {})
 }

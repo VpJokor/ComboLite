@@ -41,15 +41,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.drawable.toBitmap
 import com.combo.core.model.AuthorizationRequest
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_API_METHOD_NAME
 import com.combo.core.model.AuthorizationRequest.Companion.KEY_PERMISSION_LEVEL
@@ -64,6 +69,7 @@ import com.combo.core.ui.component.InfoRow
 import com.combo.core.ui.component.PrimaryButton
 import com.combo.core.ui.component.SecondaryButton
 import com.combo.core.ui.theme.FrameworkTheme
+import timber.log.Timber
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,12 +79,35 @@ fun ApiPermissionScreen(
     onExit: () -> Unit
 ) {
     val details = request.details
-    val pluginName = details[KEY_PLUGIN_NAME] ?: request.callingPluginId
+    val callingPluginInfo = remember(request.callingPluginId) {
+        PluginManager.getAllInstallPlugins().find { it.pluginId == request.callingPluginId }
+    }
+    val pluginName = callingPluginInfo?.name ?: request.callingPluginId
+
     val apiMethodName = details[KEY_API_METHOD_NAME] ?: "未知操作"
     val permissionLevel = details[KEY_PERMISSION_LEVEL]
     val targetPluginId = details[KEY_TARGET_PLUGIN_ID]
-
     val purpose = getPurposeFromApiName(apiMethodName)
+
+    val context = LocalContext.current
+    val pluginIcon = remember(callingPluginInfo) {
+        if (callingPluginInfo == null || callingPluginInfo.iconResId == 0) {
+            return@remember null
+        }
+        try {
+            val pm = context.packageManager
+            val appInfo = pm.getPackageArchiveInfo(callingPluginInfo.path, 0)?.applicationInfo
+            appInfo?.let {
+                it.sourceDir = callingPluginInfo.path
+                it.publicSourceDir = callingPluginInfo.path
+                val pluginRes = pm.getResourcesForApplication(it)
+                ResourcesCompat.getDrawable(pluginRes, callingPluginInfo.iconResId, null)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "从已安装插件加载图标失败: ${callingPluginInfo.pluginId}")
+            null
+        }
+    }
 
     FrameworkTheme {
         Scaffold(
@@ -112,13 +141,23 @@ fun ApiPermissionScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(id = android.R.mipmap.sym_def_app_icon),
-                        contentDescription = "Plugin Icon",
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(RoundedCornerShape(12.dp)),
-                    )
+                    if (pluginIcon != null) {
+                        Image(
+                            bitmap = pluginIcon.toBitmap().asImageBitmap(),
+                            contentDescription = "Plugin Icon",
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = android.R.mipmap.sym_def_app_icon),
+                            contentDescription = "Default Plugin Icon",
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                        )
+                    }
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(text = pluginName, style = MaterialTheme.typography.titleMedium, maxLines = 1)

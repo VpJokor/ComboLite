@@ -65,13 +65,8 @@ class InstallerManager(
         const val DEX_OPTIMIZED_DIR_NAME = "dex_opt"
         const val CLASS_INDEX_FILENAME = "class_index"
 
-        // --- 核心元数据 (必要) ---
-        private const val META_PLUGIN_ID = "plugin.id"
-        private const val META_PLUGIN_VERSION = "plugin.version"
+        // 自定义的元数据键名
         private const val META_PLUGIN_ENTRY_CLASS = "plugin.entryClass"
-        // --- 其他元数据 (可选) ---
-        private const val META_PLUGIN_NAME = "plugin.name"
-        private const val META_PLUGIN_ICON_URL = "plugin.iconUrl"
         private const val META_PLUGIN_DESCRIPTION = "plugin.description"
 
         private const val ANDROID_NAMESPACE = "http://schemas.android.com/apk/res/android"
@@ -82,21 +77,22 @@ class InstallerManager(
      *
      * @property pluginId 插件的唯一标识符。
      * @property name 插件的名称。
-     * @property iconUrl 插件的图标URL。
+     * @property iconResId 插件的图标资源ID。
      * @property pluginDescription 插件的功能描述。
-     * @property pluginVersion 插件的版本号。
+     * @property versionCode 插件的版本号。
+     * @property pluginVersionName 插件的版本名称。
      * @property entryClass 插件的入口类全限定名。
      */
     @Serializable
     data class PluginConfig(
         val pluginId: String,
         val name: String,
-        val iconUrl: String,
+        val iconResId: Int, // [MODIFIED]
         val pluginDescription: String,
-        val pluginVersion: String,
+        val versionCode: Long, // [ADDED]
+        val pluginVersionName: String, // [MODIFIED]
         val entryClass: String,
     )
-
     /**
      * 表示插件安装操作的结果。
      */
@@ -171,15 +167,15 @@ class InstallerManager(
                 clearDexOptCache(pluginId)
             }
 
-            compareVersions(pluginConfig.pluginVersion, existingPlugin.version) <= 0 -> {
+            pluginConfig.versionCode <= existingPlugin.versionCode -> {
                 return@withContext InstallResult.Failure(
-                    "已安装更高或相同版本 (${existingPlugin.version})，新版本 (${pluginConfig.pluginVersion}) 不能覆盖"
+                    "已安装更高或相同版本 (code: ${existingPlugin.versionCode})，新版本 (code: ${pluginConfig.versionCode}) 不能覆盖"
                 )
             }
 
             else -> {
                 Timber.tag(TAG)
-                    .i("插件版本升级: $pluginId (${existingPlugin.version} -> ${pluginConfig.pluginVersion})")
+                    .i("插件版本升级: $pluginId (${existingPlugin.versionName} -> ${pluginConfig.pluginVersionName})")
                 clearDexOptCache(pluginId)
             }
         }
@@ -215,9 +211,10 @@ class InstallerManager(
             val pluginInfo = PluginInfo(
                 pluginId = pluginConfig.pluginId,
                 name = pluginConfig.name,
-                iconUrl = pluginConfig.iconUrl,
+                iconResId = pluginConfig.iconResId,
                 description = pluginConfig.pluginDescription,
-                version = pluginConfig.pluginVersion,
+                versionCode = pluginConfig.versionCode,
+                versionName = pluginConfig.pluginVersionName,
                 path = targetApkFile.absolutePath,
                 entryClass = pluginConfig.entryClass,
                 enabled = existingPlugin?.enabled ?: true,
@@ -413,33 +410,46 @@ class InstallerManager(
                 return null
             }
 
-            val metaData = packageInfo.applicationInfo?.metaData
+            val appInfo = packageInfo.applicationInfo
+            if (appInfo == null) {
+                Timber.tag(TAG).e("在 PackageInfo 中未找到 ApplicationInfo。")
+                return null
+            }
+            // 这一步很关键，确保 getApplicationLabel 能正确加载 APK 内的字符串资源
+            appInfo.publicSourceDir = pluginApkFile.absolutePath
+
+            val metaData = appInfo.metaData
             if (metaData == null) {
                 Timber.tag(TAG).e("插件AndroidManifest.xml中未找到<application>标签下的元数据。")
                 return null
             }
 
-            // 读取并校验必要的元数据
-            val pluginId = metaData.getString(META_PLUGIN_ID)
-            val pluginVersion = metaData.getString(META_PLUGIN_VERSION)
-            val entryClass = metaData.getString(META_PLUGIN_ENTRY_CLASS)
+            val pluginId = packageInfo.packageName
+            val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode.toLong()
+            }
+            val versionName = packageInfo.versionName ?: "0.0.0" // 提供默认值
+            val name = pm.getApplicationLabel(appInfo).toString()
+            val iconResId = appInfo.icon
 
-            if (pluginId.isNullOrBlank() || pluginVersion.isNullOrBlank() || entryClass.isNullOrBlank()) {
-                Timber.tag(TAG).e("核心元数据 (id, version, entryClass) 不能为空。")
+            val entryClass = metaData.getString(META_PLUGIN_ENTRY_CLASS)
+            val pluginDescription = metaData.getString(META_PLUGIN_DESCRIPTION) ?: ""
+
+            if (pluginId.isNullOrBlank() || entryClass.isNullOrBlank()) {
+                Timber.tag(TAG).e("核心元数据 (package, entryClass) 不能为空。")
                 return null
             }
-
-            // --- 读取可选元数据 ---
-            val name = metaData.getString(META_PLUGIN_NAME) ?: pluginId
-            val iconUrl = metaData.getString(META_PLUGIN_ICON_URL) ?: ""
-            val pluginDescription = metaData.getString(META_PLUGIN_DESCRIPTION) ?: ""
 
             val pluginConfig = PluginConfig(
                 pluginId = pluginId,
                 name = name,
-                iconUrl = iconUrl,
+                iconResId = iconResId,
                 pluginDescription = pluginDescription,
-                pluginVersion = pluginVersion,
+                versionCode = versionCode,
+                pluginVersionName = versionName,
                 entryClass = entryClass
             )
 
@@ -667,72 +677,6 @@ class InstallerManager(
     }
 
     /**
-     * 比较两个版本号字符串
-     * 支持语义化版本（SemVer 2.0.0）规范
-     * 能够精确处理主版本号、预发布标签（如 "1.0.0-rc.10"）以及它们的组合。
-     *
-     * @param version1 第一个版本号。
-     * @param version2 第二个版本号。
-     * @return 如果 version1 > version2 返回正数, version1 < version2 返回负数, 相等则返回 0。
-     */
-    private fun compareVersions(version1: String, version2: String): Int {
-        try {
-            val parts1 = version1.split('-', limit = 2)
-            val parts2 = version2.split('-', limit = 2)
-            val mainVersion1 = parts1[0]
-            val mainVersion2 = parts2[0]
-            val preRelease1 = if (parts1.size > 1) parts1[1] else null
-            val preRelease2 = if (parts2.size > 1) parts2[1] else null
-
-            val mainParts1 = mainVersion1.split('.').map { it.toInt() }
-            val mainParts2 = mainVersion2.split('.').map { it.toInt() }
-            val maxLength = maxOf(mainParts1.size, mainParts2.size)
-
-            for (i in 0 until maxLength) {
-                val num1 = mainParts1.getOrNull(i) ?: 0
-                val num2 = mainParts2.getOrNull(i) ?: 0
-                if (num1 != num2) {
-                    return num1.compareTo(num2)
-                }
-            }
-
-            when {
-                preRelease1 == null && preRelease2 == null -> return 0
-                preRelease1 != null && preRelease2 == null -> return -1
-                preRelease1 == null && preRelease2 != null -> return 1
-            }
-
-            val identifiers1 = preRelease1!!.split('.')
-            val identifiers2 = preRelease2!!.split('.')
-            val minIdLength = minOf(identifiers1.size, identifiers2.size)
-
-            for (i in 0 until minIdLength) {
-                val id1 = identifiers1[i]
-                val id2 = identifiers2[i]
-
-                if (id1 == id2) continue
-
-                val num1 = id1.toIntOrNull()
-                val num2 = id2.toIntOrNull()
-
-                return when {
-                    num1 != null && num2 != null -> num1.compareTo(num2)
-                    num1 != null -> -1
-                    num2 != null -> 1
-                    else -> id1.compareTo(id2)
-                }
-            }
-
-            return identifiers1.size.compareTo(identifiers2.size)
-
-        } catch (e: NumberFormatException) {
-            Timber.tag(TAG).w(e, "版本号解析失败，回退到字符串比较: $version1 vs $version2")
-            return version1.compareTo(version2)
-        }
-    }
-
-
-    /**
      * 清理指定插件的 DEX 优化缓存目录。
      * 此操作仅在 Android 8.0 (API 26) 以下的系统版本有效，因为更高版本由系统管理DEX优化。
      *
@@ -777,10 +721,11 @@ class InstallerManager(
                     val request = AuthorizationRequest.forInstall(
                         pluginId = pluginConfig.pluginId,
                         name = pluginConfig.name,
-                        iconUrl = pluginConfig.iconUrl,
+                        iconResId = pluginConfig.iconResId,
                         description = pluginConfig.pluginDescription,
-                        version = pluginConfig.pluginVersion,
+                        versionName = pluginConfig.pluginVersionName,
                         signature = pluginSignatures.first(),
+                        apkPath = pluginApkFile.absolutePath
                     )
                     val authorized = PluginManager.authorizationManager.requestAuthorization(request, hardFail = false)
                     if (authorized) ValidationResult(true)

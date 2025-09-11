@@ -61,14 +61,15 @@ class XmlManager(
         private const val TAG_PLUGIN = "plugin"
         private const val TAG_DESCRIPTION = "description"
         private const val ATTR_ID = "id"
-        private const val ATTR_VERSION = "version"
+        private const val ATTR_VERSION_CODE = "versionCode"
+        private const val ATTR_VERSION_NAME = "versionName"
         private const val ATTR_ENTRY_CLASS = "entryClass"
         private const val ATTR_PATH = "path"
         private const val ATTR_ENABLED = "enabled"
-        private const val ATTR_EXPORTED = "exported" // [新增]
+        private const val ATTR_EXPORTED = "exported"
         private const val ATTR_INSTALL_TIME = "installTime"
         private const val ATTR_NAME = "name"
-        private const val ATTR_ICON_URL = "iconUrl"
+        private const val ATTR_ICON_RES_ID = "iconResId"
 
         // Receiver
         private const val TAG_RECEIVERS = "receivers"
@@ -260,8 +261,11 @@ class XmlManager(
                                             pluginId = parser.getAttributeValue(null, ATTR_ID)
                                                 ?: "",
                                             name = parser.getAttributeValue(null, ATTR_NAME) ?: "",
-                                            iconUrl = parser.getAttributeValue(null, ATTR_ICON_URL) ?: "",
-                                            version = parser.getAttributeValue(null, ATTR_VERSION)
+                                            iconResId = parser.getAttributeValue(null, ATTR_ICON_RES_ID)
+                                                ?.toIntOrNull() ?: 0,
+                                            versionCode = parser.getAttributeValue(null, ATTR_VERSION_CODE)
+                                                ?.toLongOrNull() ?: 0L,
+                                            versionName = parser.getAttributeValue(null, ATTR_VERSION_NAME)
                                                 ?: "",
                                             entryClass =
                                                 parser.getAttributeValue(null, ATTR_ENTRY_CLASS)
@@ -493,8 +497,9 @@ class XmlManager(
                     serializer.startTag(null, TAG_PLUGIN)
                     serializer.attribute(null, ATTR_ID, plugin.pluginId)
                     serializer.attribute(null, ATTR_NAME, plugin.name)
-                    serializer.attribute(null, ATTR_ICON_URL, plugin.iconUrl)
-                    serializer.attribute(null, ATTR_VERSION, plugin.version)
+                    serializer.attribute(null, ATTR_ICON_RES_ID, plugin.iconResId.toString())
+                    serializer.attribute(null, ATTR_VERSION_CODE, plugin.versionCode.toString())
+                    serializer.attribute(null, ATTR_VERSION_NAME, plugin.versionName)
                     serializer.attribute(null, ATTR_ENTRY_CLASS, plugin.entryClass)
                     serializer.attribute(null, ATTR_PATH, plugin.path)
                     serializer.attribute(null, ATTR_ENABLED, plugin.enabled.toString())
