@@ -16,6 +16,7 @@
 
 package com.combo.plugin.sample
 
+import com.combo.core.api.IPluginEntryClass
 import com.combo.core.model.PluginCrashInfo
 import com.combo.core.runtime.PluginManager
 import com.combo.core.runtime.PluginManager.setValidationStrategy
@@ -30,6 +31,7 @@ import org.koin.core.context.loadKoinModules
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 import timber.log.Timber
+import kotlin.jvm.java
 
 /**
  * 主应用程序类
@@ -131,6 +133,20 @@ class HostApp : BaseHostApplication(),IPluginCrashCallback {
             module {
                 viewModel { LoadingViewModel(applicationContext) }
             },
+        )
+    }
+
+    /**
+     * 只需重写这一个方法，即可配置所有需要源码调试的插件。
+     * 在 release 构建模式下，这个方法返回的列表不会被使用。
+     */
+    override fun getDebugPlugins(): Map<String, Class<out IPluginEntryClass>> {
+        return mapOf(
+            "com.combo.plugin.sample.common" to com.combo.plugin.sample.common.PluginEntryClass::class.java,
+            "com.combo.plugin.sample.example" to com.combo.plugin.sample.example.PluginEntryClass::class.java,
+            "com.combo.plugin.sample.guide" to com.combo.plugin.sample.guide.PluginEntryClass::class.java,
+            "com.combo.plugin.sample.home" to com.combo.plugin.sample.home.PluginEntryClass::class.java,
+            "com.combo.plugin.sample.setting" to com.combo.plugin.sample.setting.PluginEntryClass::class.java
         )
     }
 }

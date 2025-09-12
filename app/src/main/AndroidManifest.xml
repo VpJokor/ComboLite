@@ -36,7 +36,9 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_icon"
         android:supportsRtl="true"
-        android:theme="@style/Theme.ComposePluginSample">
+        android:theme="@style/Theme.ComposePluginSample"
+        android:enabled="true"
+        tools:replace="android:icon, android:label">
         <provider
             android:name=".HostProvider"
             android:authorities="com.combo.plugin.sample.provider"

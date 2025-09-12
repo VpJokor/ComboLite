@@ -87,10 +87,10 @@ class InstallerManager(
     data class PluginConfig(
         val id: String,
         val name: String,
-        val iconResId: Int, // [MODIFIED]
+        val iconResId: Int,
         val pluginDescription: String,
-        val versionCode: Long, // [ADDED]
-        val pluginVersionName: String, // [MODIFIED]
+        val versionCode: Long,
+        val pluginVersionName: String,
         val entryClass: String,
     )
     /**
