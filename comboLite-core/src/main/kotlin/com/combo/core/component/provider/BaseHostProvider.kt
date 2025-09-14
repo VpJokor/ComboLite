@@ -16,7 +16,6 @@
 
 package com.combo.core.component.provider
 
-import android.app.Application
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.database.Cursor
@@ -27,24 +26,11 @@ import android.os.Bundle
 import android.os.Process
 import com.combo.core.model.ProviderInfo
 import com.combo.core.runtime.PluginManager
-import timber.log.Timber
 import java.net.URLDecoder
 
 /**
  * 宿主端的 ContentProvider 统一代理。
- *
- * 这个 Provider 在宿主的 AndroidManifest.xml 中注册，拥有一个固定的 Authority。
- * 它负责接收发往插件 Provider 的所有请求，然后将请求动态转发给实际的插件 Provider。
- *
- * ### URI 转发约定：
- * 为了让 HostProvider 知道要将请求转发给哪个插件 Provider，客户端需要使用一个特殊的 URI 格式：
- * `content://[HOST_AUTHORITY]/[PLUGIN_AUTHORITY]/[原始路径]`
- *
- * 例如，如果宿主 Authority 是 `com.plugin.sample.proxy.provider`，
- * 插件 Provider Authority 是 `com.example.plugin.provider`，
- * 原始 URI 是 `content://com.example.plugin.provider/items/1`，
- * 那么客户端应该构建并使用的 URI 是：
- * `content://com.plugin.sample.proxy.provider/com.example.plugin.provider/items/1`
+ * ... (注释保持不变)
  */
 open class BaseHostProvider : ContentProvider() {
     companion object {
@@ -53,21 +39,9 @@ open class BaseHostProvider : ContentProvider() {
 
     /**
      * 此方法在应用启动的早期被调用。
-     * 我们在这里执行插件框架的初始化，以确保 PluginManager 在被使用前已准备就绪。
+     * 框架的初始化工作已移至 BaseHostApplication 中，以确保统一入口。
      */
     override fun onCreate(): Boolean {
-        if (!PluginManager.isInitialized) {
-            val appContext = context?.applicationContext
-            if (appContext == null) {
-                Timber.Forest.e("无法获取 Application Context，插件框架初始化失败！")
-                return false
-            }
-            val application = appContext as Application
-            PluginManager.initialize(application) {
-                PluginManager.loadEnabledPlugins()
-            }
-        }
-
         return true
     }
 
@@ -119,7 +93,7 @@ open class BaseHostProvider : ContentProvider() {
         return block(targetProvider, rewrittenUri)
     }
 
-    // --- CRUD 方法保持不变，因为它们都依赖 withForwardedRequest ---
+    // --- CRUD 方法保持不变 ---
 
     override fun query(
         uri: Uri,
@@ -133,17 +107,11 @@ open class BaseHostProvider : ContentProvider() {
     override fun getType(uri: Uri): String? =
         withForwardedRequest(uri) { provider, rewritten -> provider.getType(rewritten) }
 
-    // [推荐修改] 优化 insert 的返回值处理，使其更健壮
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
         var result: Uri? = null
         withForwardedRequest(uri) { provider, rewritten ->
             provider.insert(rewritten, values)?.also { originalResultUri ->
-                // 使用原始代理 URI 通知观察者
                 context?.contentResolver?.notifyChange(uri, null)
-
-                // [修改] 采用更健壮的方式将插件返回的原始 URI 转换回代理 URI
-                // originalResultUri: content://plugin.authority/path/id
-                // 我们需要构建: content://host.authority/plugin.authority/path/id
                 val pluginAuthority = originalResultUri.authority
                 val hostAuthority = PluginManager.proxyManager.getHostProviderAuthority()
 

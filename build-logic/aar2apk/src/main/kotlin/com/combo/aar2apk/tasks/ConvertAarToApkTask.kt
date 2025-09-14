@@ -48,7 +48,6 @@ import javax.inject.Inject
 abstract class ConvertAarToApkTask @Inject constructor(
     private val execOperations: ExecOperations
 ) : DefaultTask() {
-
     // --- 输入属性 ---
     @get:InputFile
     @get:PathSensitive(PathSensitivity.RELATIVE)

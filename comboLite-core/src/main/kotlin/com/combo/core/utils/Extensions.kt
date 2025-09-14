@@ -31,10 +31,17 @@ import com.combo.core.api.IPluginActivity
 import com.combo.core.api.IPluginService
 import com.combo.core.component.provider.BaseHostProvider.Companion.KEY_TARGET_URI
 import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.installer.InstallerManager
 import com.combo.core.utils.ExtConstant.PLUGIN_ACTIVITY_CLASS_NAME
 import com.combo.core.utils.ExtConstant.PLUGIN_SERVICE_CLASS_NAME
 import com.combo.core.utils.ExtConstant.PLUGIN_SERVICE_INSTANCE_ID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import timber.log.Timber
+import java.io.File
+import java.io.IOException
 import java.net.URLEncoder
 
 internal object ExtConstant {
@@ -338,4 +345,58 @@ fun ContentResolver.registerPluginObserver(
  */
 fun ContentResolver.unregisterPluginObserver(observer: ContentObserver) {
     this.unregisterContentObserver(observer)
+}
+
+/**
+ * Debug模式核心工具：从宿主assets目录并行安装或更新所有插件。
+ *
+ * 这个函数会遍历指定目录下的所有.apk文件，并将它们复制到应用的内部存储。
+ * 随后，它会为每个插件创建一个独立的协程任务，以并行的方式调用 InstallerManager 进行安装。
+ *
+ * @param assetsDirName 存放插件APK的assets子目录名称。默认值 "plugins" 与 aar2apk 插件的默认输出目录匹配。
+ * @return 返回一个包含安装结果的列表，方便调试和追踪。
+ */
+suspend fun Context.installPluginsFromAssetsForDebug(assetsDirName: String = "plugins"): List<Pair<String, InstallerManager.InstallResult>> {
+    return try {
+        val assetManager = this.assets
+        val pluginApks = assetManager.list(assetsDirName)
+        if (pluginApks.isNullOrEmpty()) {
+            Timber.i("在 assets/$assetsDirName 目录中未找到任何插件APK。")
+            return emptyList()
+        }
+
+        Timber.i("在 assets 中找到 ${pluginApks.size} 个插件，开始并行部署...")
+
+        coroutineScope {
+            val installJobs = pluginApks.map { apkName ->
+                async(Dispatchers.IO) {
+                    if (!apkName.endsWith(".apk")) return@async null
+
+                    val tempFile = File(this@installPluginsFromAssetsForDebug.cacheDir, apkName)
+                    try {
+                        assetManager.open("$assetsDirName/$apkName").use { inputStream ->
+                            tempFile.outputStream().use { outputStream ->
+                                inputStream.copyTo(outputStream)
+                            }
+                        }
+
+                        val result = PluginManager.installerManager.installPlugin(tempFile, forceOverwrite = true)
+                        Timber.i("部署任务 '$apkName' -> ${if (result is InstallerManager.InstallResult.Success) "成功" else "失败: ${(result as? InstallerManager.InstallResult.Failure)?.reason}"}")
+                        apkName to result
+                    } catch (e: Exception) {
+                        Timber.e(e, "从 assets 部署插件 '$apkName' 失败。")
+                        apkName to InstallerManager.InstallResult.Failure("部署失败", e)
+                    } finally {
+                        if (tempFile.exists()) {
+                            tempFile.delete()
+                        }
+                    }
+                }
+            }
+            installJobs.awaitAll().filterNotNull()
+        }
+    } catch (e: IOException) {
+        Timber.tag("DebugInstaller").e(e, "访问 assets 目录 '$assetsDirName' 时出错。")
+        emptyList()
+    }
 }

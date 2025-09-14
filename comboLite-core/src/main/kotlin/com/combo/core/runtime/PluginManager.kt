@@ -19,7 +19,6 @@ package com.combo.core.runtime
 import android.app.Application
 import com.combo.core.api.IPluginEntryClass
 import com.combo.core.model.LoadedPluginInfo
-import com.combo.core.model.PluginContext
 import com.combo.core.model.PluginFrameworkContext
 import com.combo.core.model.PluginInfo
 import com.combo.core.proxy.ProxyManager
@@ -30,7 +29,6 @@ import com.combo.core.runtime.ValidationStrategy.Insecure
 import com.combo.core.runtime.ValidationStrategy.Strict
 import com.combo.core.runtime.ValidationStrategy.UserGrant
 import com.combo.core.runtime.installer.InstallerManager
-import com.combo.core.runtime.loader.PluginClassLoader
 import com.combo.core.runtime.resource.PluginResourcesManager
 import com.combo.core.security.auth.AuthorizationManager
 import com.combo.core.security.permission.PermissionLevel
@@ -41,11 +39,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.koin.android.ext.koin.androidContext
-import org.koin.core.context.GlobalContext.loadKoinModules
 import org.koin.core.context.GlobalContext.startKoin
 import timber.log.Timber
 import kotlin.reflect.jvm.javaMethod
@@ -116,16 +111,19 @@ object PluginManager {
         return frameworkContext ?: throw IllegalStateException("PluginManager has not been initialized.")
     }
 
-    // 用于存储源码调试模式下的插件信息
-    private val debugPlugins = mutableMapOf<String, Class<out IPluginEntryClass>>()
-
     /**
      * 初始化插件管理器。
+     *
+     * 初始化插件管理器时，会启动一个后台协程，用于加载插件。
+     * 插件加载完成后，会将插件的类索引和实例存储在内部状态中。
+     *
+     * @param context 应用上下文，用于访问插件资源和系统服务。
+     * @param onSetup 可选的插件加载代码块，用于在初始化完成后加载插件。
      */
     @Synchronized
     fun initialize(
         context: Application,
-        pluginLoader: (suspend () -> Unit)? = null
+        onSetup: (suspend () -> Unit)? = null
     ) {
         if (frameworkContext != null && frameworkContext?.initState?.value != InitState.NOT_INITIALIZED) {
             Timber.Forest.tag(TAG).w("PluginManager 正在初始化或已完成，跳过重复操作。")
@@ -133,7 +131,7 @@ object PluginManager {
         }
 
         frameworkContext = PluginFrameworkContext(context)
-        requireContext().initState.value = InitState.INITIALIZING
+        requireContext().initState.value = INITIALIZING
 
         try {
             Timber.Forest.tag(TAG).i("开始初始化 PluginManager 核心组件...")
@@ -144,85 +142,15 @@ object PluginManager {
             throw e
         }
 
+        requireContext().initState.value = INITIALIZED
+        Timber.Forest.tag(TAG).i("PluginManager 核心已就绪。")
+
         managerScope.launch {
             try {
-                if (debugPlugins.isNotEmpty()) {
-                    Timber.tag(TAG).i("检测到调试插件，进入源码调试模式。")
-                    loadDebugPlugins()
-                } else {
-                    Timber.tag(TAG).i("未检测到调试插件，进入常规加载模式。")
-                    pluginLoader?.invoke()
-                }
+                onSetup?.invoke()
+                Timber.Forest.tag(TAG).i("宿主自定义的框架设置任务已完成。")
             } catch (e: Exception) {
-                Timber.Forest.tag(TAG).e(e, "插件加载代码块执行失败。")
-            } finally {
-                requireContext().initState.value = INITIALIZED
-                Timber.Forest.tag(TAG).i("PluginManager 已就绪。")
-            }
-        }
-    }
-
-    /**
-     * (新增) 加载所有已注册的调试插件。
-     * 这是一个私有方法，封装了 Debug 模式下的所有加载细节。
-     */
-    private suspend fun loadDebugPlugins() = withContext(Dispatchers.IO) {
-        if (debugPlugins.isEmpty()) return@withContext
-
-        val context = requireContext()
-
-        for ((pluginId, entryClass) in debugPlugins) {
-            try {
-                Timber.tag(TAG).i("正在加载源码插件: $pluginId...")
-
-                val virtualPluginInfo = PluginInfo(
-                    id = pluginId,
-                    name = pluginId.substringAfterLast('.'),
-                    entryClass = entryClass.name,
-                    iconResId = 0,
-                    versionCode = 1L,
-                    versionName = "1.0-debug",
-                    path = "in-memory-source",
-                    description = "Source-code linked plugin",
-                    enabled = true,
-                    installTime = System.currentTimeMillis()
-                )
-
-                val loadedPlugin = LoadedPluginInfo(
-                    pluginInfo = virtualPluginInfo,
-                    classLoader = object : PluginClassLoader(
-                        pluginId = pluginId,
-                        dexPath = "",
-                        optimizedDirectory = null,
-                        librarySearchPath = null,
-                        parent = context.application.classLoader,
-                        pluginFinder = null
-                    ) {
-                        override fun findClass(name: String): Class<*> {
-                            return parent.loadClass(name)
-                        }
-                    }
-                )
-
-                // 3. 将虚拟插件信息存入状态
-                context.xmlManager.addPlugin(virtualPluginInfo)
-                context.loadedPlugins.update { it + (pluginId to loadedPlugin) }
-
-                // 4. 直接实例化插件入口类
-                val instance = entryClass.getDeclaredConstructor().newInstance()
-
-                // 5. 模拟常规加载的最后步骤
-                context.pluginInstances.update { it + (pluginId to instance) }
-                executeOnLoad(virtualPluginInfo, instance)
-                loadKoinModules(pluginId, instance)
-
-                Timber.tag(TAG).i("源码插件 [$pluginId] 加载成功。")
-
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "加载源码插件 [$pluginId] 失败。")
-                // 失败时执行回滚
-                context.loadedPlugins.update { it - pluginId }
-                context.pluginInstances.update { it - pluginId }
+                Timber.Forest.tag(TAG).e(e, "宿主自定义的框架设置任务执行失败。")
             }
         }
     }
@@ -242,22 +170,6 @@ object PluginManager {
         requireContext().validationStrategy = strategy
         Timber.i("PluginManager: ValidationStrategy 已更新为: ${strategy::class.java.simpleName}")
     }
-
-    /**
-     * (仅供Debug模式使用) 注册一个以源码形式依赖的插件。
-     * 这个方法应该在 Application.onCreate() 中，PluginManager.initialize() 之前调用。
-     *
-     * @param pluginId 插件的包名 (ID)。
-     * @param entryClass 插件的入口类 IPluginEntryClass 的 Class 对象。
-     */
-    fun registerDebugPlugin(pluginId: String, entryClass: Class<out IPluginEntryClass>) {
-        if (debugPlugins.containsKey(pluginId)) {
-            Timber.tag(TAG).w("重复注册调试插件: $pluginId")
-            return
-        }
-        debugPlugins[pluginId] = entryClass
-    }
-
 
     // --- API 转发层 ---
 
@@ -434,28 +346,6 @@ object PluginManager {
         } catch (e: Throwable) {
             Timber.Forest.tag(TAG).e(e, "从宿主实例化 '$className' 时发生错误。")
             null
-        }
-    }
-
-    private fun executeOnLoad(plugin: PluginInfo, instance: IPluginEntryClass) {
-        try {
-            val pluginContext = PluginContext(application = requireContext().application, pluginInfo = plugin)
-            instance.onLoad(pluginContext)
-            Timber.Forest.tag(TAG).d("插件 [${plugin.id}] onLoad() 执行成功。")
-        } catch (e: Exception) {
-            Timber.Forest.tag(TAG).e(e, "插件 [${plugin.id}] onLoad() 执行失败。")
-        }
-    }
-
-    private fun loadKoinModules(pluginId: String, instance: IPluginEntryClass) {
-        try {
-            val modules = instance.pluginModule
-            if (modules.isNotEmpty()) {
-                org.koin.core.context.GlobalContext.get().loadModules(modules)
-                Timber.Forest.tag(TAG).d("插件 [$pluginId] 的 ${modules.size} 个 Koin 模块加载成功。")
-            }
-        } catch (e: Exception) {
-            Timber.Forest.tag(TAG).e(e, "加载插件 [$pluginId] 的 Koin 模块失败。")
         }
     }
 }

@@ -31,15 +31,10 @@ class HostActivity : BaseHostActivity() {
         if (super.pluginActivity == null) {
             enableEdgeToEdge()
             setContent {
-//                if (BuildConfig.DEBUG) {
-//
-//                } else {
                 val resources by PluginManager.resourcesManager.mResourcesFlow.collectAsState()
                 key(resources) {
                     LoadingScreen()
                 }
-//                }
-
             }
         }
     }

@@ -17,7 +17,7 @@
 // 启用类型安全的项目访问器功能预览
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 pluginManagement {
-    includeBuild("build-logic")
+//    includeBuild("build-logic")
     repositories {
         google {
             content {

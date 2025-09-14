@@ -17,8 +17,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.combo.plugin.sample.example"
-    android:versionCode="3"
-    android:versionName="1.0.2">
+    android:versionCode="4"
+    android:versionName="1.0.3">
 
     <application
         android:label="功能示例"
@@ -32,7 +32,7 @@
 
         <receiver
             android:name=".receiver.StaticReceiver"
-            android:enabled="false"
+            android:enabled="true"
             android:exported="true"
             tools:ignore="ExportedReceiver,Instantiatable">
             <intent-filter>
@@ -58,7 +58,7 @@
 
         <meta-data
             android:name="plugin.description"
-            android:value="示例模块插件，提供了ComboLite插件化框架的各种基础使用示例" />
+            android:value="示例模块插件，提供了ComboLite插件化框架的各种基础使用示例。注意：该版本插件不再兼容ComboLite插件框架核心库版本低于2.0.0的宿主应用" />
         <meta-data
             android:name="plugin.entryClass"
             android:value="com.combo.plugin.sample.example.PluginEntryClass" />

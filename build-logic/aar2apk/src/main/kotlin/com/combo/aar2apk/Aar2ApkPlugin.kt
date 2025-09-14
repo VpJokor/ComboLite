@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.combo.aar2apk
 
 import com.combo.aar2apk.internal.model.SdkInfo
@@ -34,20 +33,37 @@ class Aar2ApkPlugin : Plugin<Project> {
     }
 
     override fun apply(project: Project) {
-        if (project != project.rootProject) {
-            throw IllegalStateException("Aar2Apk插件只能应用在根项目(root project)上。")
-        }
-
-        val extension = project.extensions.create("aar2apk", Aar2ApkExtension::class.java)
-
-        project.afterEvaluate {
-            if (extension.moduleConfigs.modules.isNotEmpty()) {
-                configureTasks(project, extension)
+        if (project == project.rootProject) {
+            applyToRootProject(project)
+        } else {
+            project.plugins.withId("com.android.application") {
+                project.plugins.apply(AppIntegrationPlugin::class.java)
             }
         }
     }
 
-    private fun configureTasks(project: Project, extension: Aar2ApkExtension) {
+    /**
+     * 插件被应用到根项目时的逻辑
+     */
+    private fun applyToRootProject(project: Project) {
+        val extension = project.extensions.create("aar2apk", Aar2ApkExtension::class.java)
+
+        project.afterEvaluate {
+            if (extension.moduleConfigs.modules.isNotEmpty()) {
+                extension.moduleConfigs.modules.forEach { config ->
+                    project.evaluationDependsOn(config.path)
+                }
+                configurePluginBuildTasks(project, extension)
+            } else {
+                project.logger.info("Aar2ApkPlugin: 未在 aar2apk.modules 中配置任何模块，跳过任务创建。")
+            }
+        }
+    }
+
+    /**
+     * 在根项目中配置所有插件构建任务
+     */
+    private fun configurePluginBuildTasks(project: Project, extension: Aar2ApkExtension) {
         val sdkPath = SdkLocator.getSdkPath(project)
         val buildToolsVersion = SdkLocator.findLatestBuildTools(sdkPath)
         val platformVersion = SdkLocator.findLatestPlatform(sdkPath)
@@ -102,7 +118,6 @@ class Aar2ApkPlugin : Plugin<Project> {
                             lenient(true)
                         }.files)
                     }
-
                     if (options.includeDependenciesRes.get()) {
                         localDependencyResDirs.from(config.incoming.artifactView {
                             attributes {
@@ -115,7 +130,6 @@ class Aar2ApkPlugin : Plugin<Project> {
                             lenient(true)
                         }.files)
                     }
-
                     if (options.includeDependenciesDex.get()) {
                         localDependencyClasses.from(config.incoming.artifactView {
                             attributes {
@@ -128,7 +142,6 @@ class Aar2ApkPlugin : Plugin<Project> {
                             lenient(true)
                         }.files)
                     }
-
                     if (options.includeDependenciesAssets.get()) {
                         localDependencyAssets.from(config.incoming.artifactView {
                             attributes {
@@ -141,7 +154,6 @@ class Aar2ApkPlugin : Plugin<Project> {
                             lenient(true)
                         }.files)
                     }
-
                     if (options.includeDependenciesJni.get()) {
                         localDependencyJniLibs.from(config.incoming.artifactView {
                             attributes {
@@ -154,10 +166,8 @@ class Aar2ApkPlugin : Plugin<Project> {
                             lenient(true)
                         }.files)
                     }
-
                     outputDirectory.set(project.layout.buildDirectory.dir("outputs/plugin-apks/$buildType"))
                 }
-
                 if (buildType == "debug") {
                     debugTaskNames.add(taskName)
                 } else {
@@ -170,11 +180,13 @@ class Aar2ApkPlugin : Plugin<Project> {
             group = GROUP_MAIN
             description = "一键构建所有已配置模块的Debug插件APK"
             dependsOn(debugTaskNames)
+            outputs.upToDateWhen { false }
         }
         project.tasks.register("buildAllReleasePluginApks") {
             group = GROUP_MAIN
             description = "一键构建所有已配置模块的Release插件APK"
             dependsOn(releaseTaskNames)
+            outputs.upToDateWhen { false }
         }
 
         project.tasks.register<Delete>("cleanAllPluginApks") {

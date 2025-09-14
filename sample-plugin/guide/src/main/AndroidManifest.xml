@@ -23,7 +23,7 @@
         android:label="开发指南">
         <meta-data
             android:name="plugin.description"
-            android:value="ComboLite插件使用向导，提供插件化框架基础介绍" />
+            android:value="ComboLite插件使用向导，提供插件化框架基础介绍。注意：该版本插件不再兼容ComboLite插件框架核心库版本低于2.0.0的宿主应用" />
         <meta-data
             android:name="plugin.entryClass"
             android:value="com.combo.plugin.sample.guide.PluginEntryClass" />

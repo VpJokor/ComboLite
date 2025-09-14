@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import com.combo.aar2apk.PackageBuildType
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
@@ -22,6 +23,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.aar2apk)
 }
 
 android {
@@ -62,7 +64,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles("proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
@@ -78,7 +80,7 @@ android {
             }
         }
         debug {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -108,6 +110,12 @@ android {
     }
 }
 
+packagePlugins {
+    enabled.set(true)
+    buildType.set(PackageBuildType.RELEASE)
+    pluginsDir.set("debug_plugins")
+}
+
 dependencies {
 
     // 插件核心库 远程依赖方式
@@ -116,11 +124,4 @@ dependencies {
     // 插件核心库 本地依赖方式
     implementation(projects.comboLiteCore)
     implementation(projects.dependencies)
-
-    // 插件库方便快速Debug
-    debugImplementation(projects.samplePlugin.common)
-    debugImplementation(projects.samplePlugin.home)
-    debugImplementation(projects.samplePlugin.guide)
-    debugImplementation(projects.samplePlugin.example)
-    debugImplementation(projects.samplePlugin.setting)
 }

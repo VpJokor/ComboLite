@@ -137,3 +137,43 @@ abstract class Aar2ApkExtension @Inject constructor(objects: ObjectFactory) {
         action.execute(moduleConfigs)
     }
 }
+
+/**
+ * 定义插件APK的构建类型
+ */
+enum class PackageBuildType {
+    DEBUG,
+    RELEASE
+}
+
+/**
+ * 用于在App模块中配置插件打包的扩展
+ */
+abstract class PackagePluginsExtension {
+    /**
+     * 是否启用自动打包插件集成到宿主APK功能
+     * 开启后，插件APK会被自动打包到宿主APK的assets目录下
+     */
+    @get:Input
+    abstract val enabled: Property<Boolean>
+
+    /**
+     * 指定要打包的插件构建类型 (DEBUG or RELEASE)
+     */
+    @get:Input
+    abstract val buildType: Property<PackageBuildType>
+
+    /**
+     * 插件APK在assets目录中的子目录路径
+     * 例如："plugins"，则插件APK会被打包到assets/plugins目录下
+     */
+    @get:Input
+    abstract val pluginsDir: Property<String>
+
+    init {
+        // 设置默认值
+        enabled.convention(false)
+        buildType.convention(PackageBuildType.DEBUG)
+        pluginsDir.convention("plugins")
+    }
+}

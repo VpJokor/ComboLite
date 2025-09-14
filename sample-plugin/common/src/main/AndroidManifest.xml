@@ -29,7 +29,7 @@
 
         <meta-data
             android:name="plugin.description"
-            android:value="公共模块插件，提供各个插件的公共功能、资源，如BaseViewModel、ComposeNavigator导航、各种utils工具类等等" />
+            android:value="公共模块插件，提供各个插件的公共功能、资源，如BaseViewModel、ComposeNavigator导航、各种utils工具类等等。注意：该版本插件不再兼容ComboLite插件框架核心库版本低于2.0.0的宿主应用" />
 
     </application>
 </manifest>

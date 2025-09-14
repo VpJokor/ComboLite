@@ -24,7 +24,7 @@
         android:icon="@drawable/plugin_icon">
         <meta-data
             android:name="plugin.description"
-            android:value="首页模块插件，提供宿主应用的首页页面，负责为guide、example、setting这三个插件模块切换导航" />
+            android:value="首页模块插件，提供宿主应用的首页页面，负责为guide、example、setting这三个插件模块切换导航。注意：该版本插件不再兼容ComboLite插件框架核心库版本低于2.0.0的宿主应用" />
         <meta-data
             android:name="plugin.entryClass"
             android:value="com.combo.plugin.sample.home.PluginEntryClass" />
