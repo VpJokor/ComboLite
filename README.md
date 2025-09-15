@@ -30,7 +30,7 @@
 
 - [🤔 为什么选择 ComboLite？](#-为什么选择-combolite)
 - [✨ 核心特性](#-核心特性)
-- [🚀 开始集成](#-开始集成-getting-started)
+- [🚀 快速开始](#-快速开始-getting-started)
 - [📚 文档列表](#-接下来做什么)
 - [🆚 框架对比与技术选型](#-框架对比与技术选型)
 - [🤝 如何贡献](#-如何贡献)
@@ -49,181 +49,204 @@
 **`ComboLite` 的诞生，正是为了终结这一困境。** 我们回归官方、拥抱简单，以完全公开的 API 为基石，实现了 *
 *0 Hook、0 反射** 的纯净架构，从根本上保证了框架的极致稳定与长远兼容性。
 
-|          安装启动插件           |          安装启动插件2          |          示例插件页面           |
+|           示例插件页           |           示例插件页           |           示例插件页           |
 |:-------------------------:|:-------------------------:|:-------------------------:|
 | ![示例图](image/figure1.jpg) | ![示例图](image/figure2.jpg) | ![示例图](image/figure3.jpg) |
 
-|          示例插件页面2          |          去中心化管理           |         崩溃熔断与自愈提示         |
+|          安全校验机制           |          安全校验机制           |          异常处理机制           |
 |:-------------------------:|:-------------------------:|:-------------------------:|
 | ![示例图](image/figure4.jpg) | ![示例图](image/figure5.jpg) | ![示例图](image/figure6.jpg) |
 
-> 🔗 **下载示例App**: [https://github.com/lnzz123/ComboLite/tree/master/app/release/app-release.apk](https://raw.githubusercontent.com/lnzz123/ComboLite/refs/heads/master/app/release/app-release.apk)
 
----
+> 🔗 **下载示例App**: [https://github.com/lnzz123/ComboLite/tree/master/app/release/app-release.apk](https://raw.githubusercontent.com/lnzz123/ComboLite/refs/heads/master/app/release/app-release.apk)
+>
+> **(说明：插件 APK 托管于 GitHub，若下载缓慢或失败，请尝试开启 VPN。)**
+
+-----
 
 ### ✨ 核心特性
 
-#### 🎨 为 Compose 而生，拥抱现代技术栈
+ `ComboLite` 的众多优势归纳为四大核心支柱，它们共同构成了框架的独特竞争力。
 
-`ComboLite` 原生为新一代 Android UI 工具包 Jetpack Compose 设计，插件内可无缝使用 `@Composable`
-函数构建界面。同时，框架完美集成 Kotlin Coroutines、StateFlow 等现代技术，并采用 Koin
-进行依赖注入，让您在插件开发中也能享受最前沿、最高效的技术栈。
+#### 🚀 极致开发体验 (Developer Experience)
+* **源码级无缝调试**：通过配套 Gradle 插件，插件模块可在开发时自动集成进宿主，实现与原生模块完全一致的断点调试体验。彻底告别传统插件开发繁琐的“打包-安装-运行”循环，大幅提升开发迭代效率。
+* **为 Compose 而生**：原生为 Jetpack Compose 设计，完美拥抱现代 Android UI 工具包。
+* **拥抱现代技术栈**：深度集成 Kotlin Coroutines, Flow, Koin 等，让您在插件开发中也能享受最前沿的技术栈。
 
-#### 🛡️ 极致稳定：0 Hook & 0 反射
+#### 🛡️ 企业级稳定性与安全 (Stability & Security)
+* **绝对稳定的基石：0 Hook & 0 反射**：完全基于 Android 官方公开 API 构建，从根本上保证了框架的极致稳定与长远兼容性，让您彻底告别因系统升级导致的兼容性噩梦。
+* **精细化权限管控**：通过 `@RequiresPermission` 注解实现对核心 API 的安全分级。高权限操作（如 `setPluginEnabled`）仅限**宿主签名的插件**调用 (`PermissionLevel.HOST`)；部分操作则限制为**插件对自身**的管理 (`PermissionLevel.SELF`)，为框架构建了坚实的安全防线。
+* **灵活的校验策略**：提供 `Strict` (严格同签)、`UserGrant` (用户授权)、`Insecure` (不校验) 等多种签名校验策略，允许宿主根据业务场景，在安全性与开放性之间做出最合适的选择。
+* **崩溃熔断与自愈**：内置强大的异常处理器，能自动隔离并禁用崩溃的插件，防止应用陷入无限重启。同时提供友好的错误提示 UI 和精细化的回调机制，最大限度保障宿主应用的健壮性。
 
-这是 `ComboLite` 最核心的承诺。我们完全基于 Android 官方推荐的 `ClassLoader` 和代理（Proxy）模式，不使用任何非公开
-API。这意味着框架拥有无与伦比的稳定性，能天然兼容从 Android 7.0 到未来所有 Android
-版本，让您彻底告别因系统升级导致的兼容性噩梦。
+#### 🏗️ 灵活的动态化架构 (Flexible Architecture)
+* **去中心化设计**：打破传统“宿主-插件”的强中心化模式，任何插件都可拥有管理其他插件的能力。轻松实现“插件商店”、“按需下载”、“插件自更新”等高级动态化功能。
+* **“空壳”宿主支持**：支持将宿主 App 极致轻量化，所有业务功能和 UI 均由插件动态提供，为模块化解耦和团队协作开发提供了终极方案。
+* **智能依赖解析**：插件间的依赖关系无需预先配置，框架会在运行时自动发现并构建依赖图。热更新核心插件时，所有依赖它的上游插件均会自动链式重启，确保依赖的绝对一致性。
 
-#### 🚑 崩溃熔断与自愈机制
-
-内置强大的 `PluginCrashHandler`，当插件因缺少依赖等问题导致崩溃时，框架会自动**禁用**
-有问题的插件，防止应用陷入无限重启的循环，并引导用户到友好的错误提示页面。这个机制将一个潜在的、导致应用瘫痪的致命错误，转化为一个可隔离、可恢复的局部问题，最大限度地保障了宿主应用的稳定性。
-
-#### 🔗 智能依赖解析与链式重启
-
-框架拥有强大的动态依赖解析能力。插件间的依赖关系无需预先配置，会在类加载时被自动发现并动态构建成依赖图。当您需要热更新一个被其他插件依赖的核心插件时，
-`ComboLite` 提供的**链式重启机制**会自动卸载并重载所有受影响的上游插件，完美修复因热更新导致的类加载器冲突问题，确保依赖链的绝对一致性。
-
-#### 🌐 创新的去中心化架构
-
-我们打破了传统“宿主-插件”的强中心化模式。在 `ComboLite` 中，**任何插件都拥有管理（下载、安装、更新、卸载）自身或其他插件的能力
-**。这赋予了开发者前所未有的灵活性，可以轻松实现“插件商店”、“按需下载”、“插件自我更新”等高级功能，构建真正动态化的应用生态。
-
-#### 📦 “空壳”宿主支持
-
-得益于去中心化架构，您的宿主 App 可以做到真正的“空壳化”——即没有任何业务逻辑，完全退化为一个启动入口和插件管理容器。
-**所有功能、所有 UI 均可由插件动态提供**。这种模式为应用的模块化、动态化和团队协作开发提供了极致的解耦方案。
-
-#### ♻️ 透明化的合并式资源管理
-
-`ComboLite` 采用合并式资源管理。插件被加载时，其所有资源（layouts, drawables, strings 等）会被动态地合并到宿主的全局
-`Resources` 对象中。这意味着您**无需关心资源来自哪个插件，可以像访问宿主自身资源一样，透明地访问所有已加载插件的资源
-**，极大地简化了插件的资源使用方式。
-
-#### 🗃️ Service 多实例与服务池
-
-`ComboLite` 创新地支持**服务实例池**。您可以通过一个唯一的 `instanceId`，将同一个插件 `Service`
-类启动为多个相互隔离、独立运行的实例。这对于需要同时处理多个独立任务（如下载管理、多路视频流、并行计算等）的场景非常有用，是很多其他插件化框架所不具备的高级功能。
-
-#### ⚡️ 闪电般的类查找性能
-
-传统插件框架普遍存在跨插件类查找的性能瓶颈。`ComboLite` 通过在加载时为所有插件建立全局类索引，实现了 *
-*`O(1)` 时间复杂度**的跨插件类查找。无论您的应用规模多庞大、插件多复杂，类查找都能瞬间完成，保证了应用的流畅运行。
-
----
+#### ⚡ 高性能核心 (High-Performance Core)
+* **O(1) 类查找**：通过建立全局类索引，实现了 `O(1)` 时间复杂度的跨插件类查找，无论应用规模多庞大，类查找都能瞬间完成。
+* **透明化资源管理**：所有插件的资源会被动态合并，开发者可以像访问宿主自身资源一样，透明地访问所有已加载插件的资源，无需关心其来源。
+* **Service 实例池**：支持将同一个插件 `Service` 类启动为多个相互隔离的实例，为并行任务处理（如下载管理、多路视频流）等复杂场景提供了强大的支持。
+-----
 
 ### 🏗️ 架构概览
 
-`ComboLite` 采用简洁而强大的微核设计，由几个核心组件协同工作，逻辑清晰，易于扩展。
+`ComboLite` 采用简洁而强大的微核设计，通过分层架构实现高度的内聚和解耦，逻辑清晰，易于扩展。
+
+#### 框架分层结构
+
+```mermaid
+graph TD
+    subgraph " "
+        direction LR
+        A[宿主应用<br>Host App]
+        P[插件应用<br>Plugin Apps]
+    end
+
+    subgraph "框架接口层 (Framework API Layer)"
+        direction LR
+        IPlugin["插件接口<br>(IPluginActivity, IPluginService...)"]
+        PluginManagerAPI["PluginManager API"]
+        BaseClasses["组件基类<br>(BasePluginActivity, BaseHostService...)"]
+    end
+
+    subgraph "核心服务层 (Core Service Layer)"
+        direction LR
+        LifecycleManager[生命周期管理<br>PluginLifecycleManager]
+        InstallerManager[安装与解析<br>InstallerManager]
+        ResourceManager[资源管理<br>PluginResourcesManager]
+    end
+    
+    subgraph "运行时 & 安全层 (Runtime & Security Layer)"
+        direction LR
+        Loader["类加载与依赖<br>(PluginClassLoader, DependencyManager)"]
+        Proxy["组件代理调度<br>ProxyManager"]
+        Security["安全体系<br>(权限, 签名, 授权, 异常)"]
+    end
+
+    subgraph " "
+        Android[Android 系统 & ART 虚拟机]
+    end
+
+    A & P --> PluginManagerAPI & IPlugin & BaseClasses
+    PluginManagerAPI & IPlugin & BaseClasses --> LifecycleManager & InstallerManager & ResourceManager
+    LifecycleManager & InstallerManager & ResourceManager --> Loader & Proxy & Security
+    Loader & Proxy & Security --> Android
+```
+
+#### 内部组件交互
 
 ```mermaid
 graph TD
     subgraph "宿主应用 & 系统"
-        HostApp[宿主应用代码] -- 调用 API --> PM(插件管理器)
+        HostApp[宿主应用代码] -- 调用 API --> PM(PluginManager)
         AndroidSystem[Android 系统] -- 与...交互 --> HostProxies["宿主代理组件<br>(HostActivity, HostService...)"]
     end
 
-    subgraph "ComboLite 核心管理器"
-        PM -- 协调 --> IM(安装器)
-        PM -- 协调 --> RM(资源管理器)
-        PM -- 协调 --> ProxyM(调度器)
-        PM -- 协调 --> DM(依赖管理器)
+    subgraph "ComboLite 核心服务"
+        PM -- 协调 --> Installer(InstallerManager)
+        PM -- 协调 --> ResManager(PluginResourcesManager)
+        PM -- 协调 --> ProxyM(ProxyManager)
+        PM -- 协调 --> DepManager(DependencyManager)
+        PM -- 协调 --> Lifecycle(PluginLifecycleManager)
+        PM -- 协调 --> Security(Security Managers)
     end
     
-    subgraph "数据 & 状态"
+    subgraph "运行时 & 数据状态"
         OnDiskState["磁盘状态<br>plugins.xml, APKs"]
         InMemoryState["内存状态<br>已加载插件, 类加载器, 实例"]
         ClassIndex["全局类索引<br>Map<类, 插件ID>"]
         DepGraph["依赖图<br>(正向 & 反向)"]
         MergedRes["合并后的资源"]
     end
+
+    subgraph "安全体系 (Security)"
+        Security -- 包含 --> PermManager(PermissionManager)
+        Security -- 包含 --> AuthManager(AuthorizationManager)
+        Security -- 包含 --> Validator(SignatureValidator)
+    end
     
-    %% --- 管理器职责 ---
-    IM -- "管理" --> OnDiskState
+    %% --- 职责关联 ---
+    Installer -- "管理" --> OnDiskState
     PM -- "管理" --> InMemoryState
     PM -- "构建 & 持有" --> ClassIndex
-    DM -- "构建 & 持有" --> DepGraph
-    RM -- "创建 & 持有" --> MergedRes
+    DepManager -- "构建 & 持有" --> DepGraph
+    ResManager -- "创建 & 持有" --> MergedRes
     ProxyM -- "管理" --> HostProxies
     
-    %% --- 关键交互 ---
-    subgraph "关键交互: 类加载器委托"
+    %% --- 关键交互: 类加载器委托 ---
+    subgraph "关键交互: 跨插件类查找"
         direction LR
         style RequesterPCL fill:#f9f,stroke:#333,stroke-width:2px
         style TargetPCL fill:#ccf,stroke:#333,stroke-width:2px
         
-        RequesterPCL["请求方<br>插件类加载器"] -- "findClass()查找失败时" --> DM
-        DM -- "1. 查找" --> ClassIndex
-        DM -- "2. 记录依赖" --> DepGraph
-        DM -- "3. 从...加载" --> TargetPCL["目标<br>插件类加载器"]
+        RequesterPCL["请求方<br>PluginClassLoader"] -- "findClass() 失败时委托" --> DepManager
+        DepManager -- "1. 查索引" --> ClassIndex
+        DepManager -- "2. 记录依赖" --> DepGraph
+        DepManager -- "3. 从目标加载" --> TargetPCL["目标<br>PluginClassLoader"]
     end
     
-    InMemoryState -- 包含 --> RequesterPCL
-    InMemoryState -- 包含 --> TargetPCL
-````
-
-* **`PluginManager`**: 框架的中心协调器，负责插件的加载、卸载、重启和生命周期管理。
-* **`InstallerManager`**: 负责插件的安装、更新和合法性校验。
-* **`ResourceManager`**: 负责插件资源的加载与管理，实现宿主与插件资源的无缝合并。
-* **`ProxyManager`**: 负责 Android 四大组件的代理和生命周期分发。
-* **`DependencyManager`**: 负责维护插件间的动态依赖关系图和全局类索引。
+    InMemoryState -- 包含 --> RequesterPCL & TargetPCL
+```
 
 -----
 
+### 🚀 快速开始 (Getting Started)
 
-### 🚀 开始集成 (Getting Started)
+`ComboLite` 已发布至 Maven Central，您可以像集成任何标准库一样轻松地将其引入项目。
 
-`ComboLite` 现已正式发布至 Maven Central 及 Gradle 插件门户。现在，您可以像集成任何标准库一样，通过远程依赖将
-`ComboLite` 轻松地集成到您的项目中。
+#### 第 1 步: 定义项目依赖 (`libs.versions.toml`)
 
-#### 第 1 步: 在 `libs.versions.toml` 中定义依赖项
-
-我们强烈建议使用 Version Catalog (`libs.versions.toml`) 来集中管理您项目的所有依赖。这种现代化的方式能让您的依赖管理更加清晰和可维护。
-
-在您的 `gradle/libs.versions.toml` 文件中，添加以下版本、库和插件定义：
+我们强烈建议使用 Version Catalog (`gradle/libs.versions.toml`) 来统一管理依赖。
 
 ```toml
 # in gradle/libs.versions.toml
 
 [versions]
-# ... 其他版本定义
-combolite = "1.0.0"  # 建议替换为最新的稳定版
-aar2apk = "1.0.0" # 建议替换为最新的稳定版
+# ...
+combolite = "2.0.0"          # 建议使用最新稳定版
+combolite-aar2apk = "1.1.0"   # 建议使用最新稳定版
 
 [libraries]
-# ... 其他库定义
+# ...
 combolite-core = { group = "io.github.lnzz123", name = "combolite-core", version.ref = "combolite" }
 
 [plugins]
-# ... 其他插件定义
-combolite-aar2apk = { id = "io.github.lnzz123.combolite-aar2apk", version.ref = "aar2apk" }
-
+# ...
+combolite-aar2apk = { id = "io.github.lnzz123.combolite-aar2apk", version.ref = "combolite-aar2apk" }
 ```
 
-#### 第 2 步: 配置 Gradle 构建脚本
+#### 第 2 步: 全局插件配置 (项目根 `build.gradle.kts`)
 
-现在，在您的 Gradle 脚本中应用这些依赖。
-
-**① 在项目根 `build.gradle.kts` 中应用打包插件**:
-
-此插件仅需在项目根目录应用一次，它将负责所有已声明插件模块的打包任务。
+在项目**根目录**的 `build.gradle.kts` 中，应用插件并进行全局配置。
 
 ```kotlin
 // in your project's root /build.gradle.kts
 plugins {
-    // ... 其他插件
     alias(libs.plugins.combolite.aar2apk)
 }
 
-// 您可以在此配置 aar2apk 的打包策略，详情请参阅 [插件打包指南]
+// 在此声明所有插件模块，并配置打包策略与签名信息
 aar2apk {
-    // signing { ... }
-    // modules { module(":your-plugin-module") }
+    modules {
+        module(":sample-plugin:common")
+        module(":sample-plugin:home")
+        // ... 添加您所有的插件模块
+    }
+
+    signing {
+        keystorePath.set(rootProject.file("your_keystore.jks").absolutePath)
+        keystorePassword.set("your_password")
+        keyAlias.set("your_alias")
+        keyPassword.set("your_password")
+    }
 }
 ```
 
-**② 在宿主 App 模块的 `build.gradle.kts` 中添加核心库**:
+#### 第 3 步: 宿主 App 配置 (`:app/build.gradle.kts`)
+
+在**宿主 App** 的 `build.gradle.kts` 中，添加核心库并配置开发时的自动集成。
 
 ```kotlin
 // in your :app/build.gradle.kts
@@ -231,25 +254,30 @@ plugins {
     // ...
 }
 
+// 配置插件自动集成功能，用于源码无缝调试
+packagePlugins {
+    // 启用后，上述声明的插件将在构建时自动打包进宿主 assets
+    enabled.set(true)
+    buildType.set(PackageBuildType.DEBUG) // 或 RELEASE
+    pluginsDir.set("debug_plugins")       // 插件在 assets 内的存放目录
+}
+
 dependencies {
-    // ... 其他依赖
     implementation(libs.combolite.core)
+    // ...
 }
 ```
 
-**③ 在您的插件模块 (Library) 的 `build.gradle.kts` 中添加核心库**:
+#### 第 4 步: 插件模块配置 (e.g. `:sample-plugin:home`)
 
-插件模块应使用 `compileOnly` 依赖核心库，表示该库在运行时由宿主提供。
+在您的**插件 Library** 模块中，使用 `compileOnly` 依赖核心库。
 
 ```kotlin
-// in your :your-plugin-module/build.gradle.kts
-plugins {
-    // ...
-}
-
+// in your :sample-plugin:home/build.gradle.kts
 dependencies {
-    // ... 其他依赖
+    // 插件模块必须使用 compileOnly，因为框架由宿主在运行时提供
     compileOnly(libs.combolite.core)
+    // ...
 }
 ```
 
@@ -284,7 +312,7 @@ dependencies {
 | **主要优势**               | **极致稳定、现代技术栈、开发体验好、去中心化架构**                  | 设计思想精巧，Activity 兼容性好              | 功能全面，曾有大规模验证                         | 特定版本下功能强大完备                  | 稳定可靠，Google Play 生态集成          |
 | **主要权衡**               | 代理模式对部分冷门 `launchMode` 支持受限                  | 学习曲线陡峭，构建系统黑盒，已不兼容新版AGP           | 侵入性较强，兼容性问题随系统升级增多                   | **稳定性差，已不适用于现代开发**           | **非热更新，必须通过应用商店发布，无法加载本地 APK** |
 
----
+-----
 
 * **对比 Hook 方案 (如 VirtualAPK / DroidPlugin)**
 
@@ -300,12 +328,14 @@ dependencies {
       工具链完美同步，让开发者能将精力聚焦于业务本身，而非复杂的框架底层。
 
 * **对比 RePlugin (360)**
+
     * **它们**: 同样是业界经典，通过 Hook ClassLoader 实现功能，但在新版 Android 对非公开 API
       限制愈发严格的今天，其稳定性面临挑战。项目也已基本停止维护，对 Compose 等新技术栈缺乏支持。
     * **我们**: **选择面向未来的稳定路线**。`ComboLite` 彻底规避了 Hook 带来的兼容性风险，并原生为
       Jetpack Compose 设计，确保在现代技术栈下获得最佳的开发体验和长期维护性。
 
 * **对比 Google Play Feature Delivery**
+
     * **它们**: 是一个**应用分发方案**，旨在减少初始安装包体积，所有模块更新仍需通过应用商店审核和下发，本质上是“冷分发”，无法实现真正的热更新。
     * **我们**: **是一个纯粹的热更新框架**。`ComboLite` 赋予 App 在运行时加载任意来源 APK
       的能力，可以完全绕开应用商店进行功能迭代和 Bug 修复，这才是动态化的核心价值。
@@ -314,7 +344,7 @@ dependencies {
 主流场景的极致稳定与简洁性的前提下，审慎对待那 **1%** 的边缘场景。
 
 > **总而言之，如果您正在开发一个面向未来的、使用 Jetpack
-Compose、且将长期稳定性和可维护性放在首位的项目，`ComboLite` 将是您的不二之选。**
+> Compose、且将长期稳定性和可维护性放在首位的项目，`ComboLite` 将是您的不二之- 选。**
 
 -----
 
