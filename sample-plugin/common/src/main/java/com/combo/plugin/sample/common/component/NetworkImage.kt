@@ -35,13 +35,11 @@ import coil3.request.crossfade
  */
 @Composable
 fun NetworkImage(
-    // 名称可以更明确一些
     model: Any?,
     modifier: Modifier = Modifier,
     contentDescription: String?,
     contentScale: ContentScale = ContentScale.Fit,
 ) {
-    // 使用更简洁的 AsyncImage 组件，它内部已经处理了占位图、错误图等状态
     AsyncImage(
         model =
             ImageRequest

@@ -1,91 +1,98 @@
-# Quick Start: Build and Run Your First Plugin from Scratch
+# Quick Start: Run Your First Plugin from Scratch
 
-Welcome to your exploration of `ComboLite`! This guide will serve as your patient mentor, walking
-you through the entire process of building and launching your first dynamic plugin in the time it
-takes to drink a cup of coffee.
+Welcome to your journey with `ComboLite`\! This guide will act as your patient companion, leading you to build and launch your first dynamic plugin in the time it takes to drink a cup of coffee.
 
-We will guide you through **host configuration**, **plugin creation**, and **plugin execution**. You
-will experience the satisfaction of "lighting up" your first plugin without getting bogged down in
-complex packaging details. Are you ready? Let's get started!
+We will walk you through the entire process of **host configuration**, **plugin creation**, and **plugin execution**. This will allow you to quickly experience the satisfaction of "lighting up" your first plugin without getting bogged down in complex packaging details. Ready? Let's get started\!
 
 ### Prerequisites
 
-Before we begin, please ensure you have met the following conditions:
-
-* You have successfully integrated the `ComboLite` core library into your Android project according
-  to the main `README`'s instructions.
+Before we begin, we assume that you have already successfully integrated the `ComboLite` core library and packaging plugin into your Android project, as instructed in the main `README`.
 
 ### Overall Process Preview
 
-Before diving into the details, let's look at a simple flowchart to understand the journey we are
-about to take:
-
 ```mermaid
 graph LR
-    A[🏠 Configure Host App] --> B[🧩 Create Plugin Module];
-    B --> C{Package into APK};
-    C --> D[📥 Place APK in Assets];
-    D --> E[🚀 Write Loading Code];
-    E --> F[🎉 Run & Witness the Magic];
-
-    subgraph "Host"
-        A
-        D
-        E
-        F
+    subgraph "Development Environment Setup"
+        A[🏠 Configure Host & Plugin Modules] --> B[⚙️ Declare Plugins in Root build.gradle];
+        B --> C[🔧 Enable Auto-Integration in Host build.gradle];
     end
 
-    subgraph "Plugin"
-        B
+    subgraph "Build Stage (Handled Automatically by Gradle)"
+        D{Build Host App};
+        D -- Auto-triggers --> E[1. Compile Plugin Modules];
+        E -- Generates APK --> F[2. Package Plugin APKs into Host Assets];
     end
-    
-    linkStyle 2 stroke-dasharray: 5 5;
+
+    subgraph "Runtime Stage"
+        G[🚀 Write Loading & Interaction Code] --> H[🎉 Run and Witness the Magic];
+    end
+
+    C --> D;
+    F --> G;
 ```
 
 -----
 
 ## Step 1: Configure the Host App
 
-The host is the "home" for all plugins. We need to perform some basic initialization and
-configuration for it.
+The host is the "home" for all plugins. We need to perform some basic initialization and configuration for it.
 
 ### 1.1 Initialize the Plugin Framework
 
-`ComboLite`'s initialization is very flexible, offering two methods:
+`ComboLite` offers flexible initialization options. We provide two methods:
 
-#### Method 1: Fully Automatic Initialization (Recommended)
+#### Method 1: Automatic Initialization (Recommended)
 
-This is the easiest and most recommended approach. Simply have your `Application` class inherit from
-`BaseHostApplication`, and the framework will automatically handle all initialization tasks for you,
-including the plugin loader, resource manager, and crash handler.
-
-**This is all the initialization code you need!**
+This is the most hassle-free approach. Simply have your `Application` class inherit from `BaseHostApplication`, and the framework will handle the underlying initialization process for you. You only need to override the `onFrameworkSetup` method to perform all core framework configurations within a background coroutine.
 
 ```kotlin
 // in :app/src/main/java/your/package/name/MainApplication.kt
-import com.combo.core.base.BaseHostApplication
+import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.ValidationStrategy
+import com.combo.core.runtime.app.BaseHostApplication
+import com.combo.core.security.crash.PluginCrashHandler
 
-// Just inherit, and all configuration is done with one click
 class MainApplication : BaseHostApplication() {
     override fun onCreate() {
         super.onCreate()
         // Your other application-level initialization logic
     }
+
+    /**
+     * Override this method to provide custom plugin framework setup logic on a background thread.
+     * PluginManager.initialize is called automatically within super.onCreate(), and this block will be executed.
+     */
+    override fun onFrameworkSetup(): suspend () -> Unit {
+        return {
+            // --- Perform all framework-related configurations here ---
+
+            // Example 1: Configure proxy pools for the four major components
+            PluginManager.proxyManager.apply {
+                setHostActivity(HostActivity::class.java)
+                setServicePool(listOf(HostService1::class.java /*, ... */))
+                setHostProviderAuthority("com.your.package.provider")
+            }
+
+            // Example 2: Set the plugin signature validation strategy (here, set to Insecure for development only)
+            PluginManager.setValidationStrategy(ValidationStrategy.Insecure)
+            
+            // Note: The timing of plugin loading should be determined by your business logic, 
+            // for example, triggered on the main page or at a specific moment.
+        }
+    }
 }
 ```
 
-#### Method 2: Manual Initialization (For Special Cases)
+#### Method 2: Manual Initialization (For Special Scenarios)
 
-If your `Application` class cannot inherit from `BaseHostApplication` due to project constraints,
-you can opt for manual initialization. Please ensure all steps are configured correctly to avoid
-potential issues.
+If your `Application` class cannot inherit from `BaseHostApplication` due to project constraints, you can opt for manual initialization.
 
 ```kotlin
 // in :app/src/main/java/your/package/name/MainApplication.kt
 import android.app.Application
-import android.util.Log
-import com.combo.core.PluginManager
-import com.combo.core.exception.PluginCrashHandler
+import com.combo.core.runtime.PluginManager
+import com.combo.core.runtime.ValidationStrategy
+import com.combo.core.security.crash.PluginCrashHandler
 
 class MainApplication : Application() {
     override fun onCreate() {
@@ -94,14 +101,11 @@ class MainApplication : Application() {
         // 1. (Important) Register the plugin crash handler
         PluginCrashHandler.initialize(this)
 
-        // 2. Initialize the PluginManager
+        // 2. Initialize the PluginManager and complete the configuration in its background task
         PluginManager.initialize(this) {
-            // 3. Asynchronously load enabled plugins
-            // This block executes on a background thread
-            val loadedCount = PluginManager.loadEnabledPlugins()
-            Log.d("MyApp", "Successfully loaded $loadedCount plugins.")
-
-            // The PluginManager's state is updated to initialized only after this block completes
+            // This code block executes on a background thread
+            PluginManager.setValidationStrategy(ValidationStrategy.Insecure)
+            // ... other configurations
         }
     }
 }
@@ -109,120 +113,70 @@ class MainApplication : Application() {
 
 ### 1.2 Configure the Host Activity
 
-To ensure that plugins can correctly access resources and be launched via proxy, your host`Activity`
-needs to be configured.
-
-Have your `MainActivity` (or any other host Activity) inherit from `BaseHostActivity`.
+To ensure that plugins can correctly access resources and be started via proxy, your host `Activity` needs to inherit from `BaseHostActivity`.
 
 ```kotlin
-import com.combo.core.base.BaseHostActivity
+import com.combo.core.component.activity.BaseHostActivity
 
 class MainActivity : BaseHostActivity() {
     // ...
 }
 ```
 
-> **Important Note**
-> `BaseHostActivity` internally overrides `getResources()` and `getAssets()` to ensure seamless
-> resource access for both the host and plugins. It also contains the core logic for proxying plugin
-`Activity` instances.
->
-> **Exception Scenario**: If your project is a **pure Jetpack Compose single-Activity application**
-> and you **do not need the plugin functionality for the four major components (specifically
-> Activity)
-**, you can choose **not to inherit** from `BaseHostActivity`. As an alternative, you must manually
-> override the `getResources()` and `getAssets()` methods in your own Activity as follows:
->
-> ```kotlin
-> override fun getResources(): Resources {
->     return PluginManager.resourceManager.getMergedResources() ?: super.getResources()
-> }
-> ```
-
-> override fun getAssets(): AssetManager {
-> return PluginManager.resourceManager.getMergedResources()?.assets ?: super.getAssets()
-> }
->
-> ```
-> ```
-
-At this point, the basic configuration for the host is complete!
-
-> **About the Four Major Components**
-> If you need to use more advanced plugin features like Service, BroadcastReceiver, or
-> ContentProvider, you will need to configure proxies and a proxy pool in your `Application` and
-`AndroidManifest`. These are advanced, optional features that will be detailed in the *
-*[[Advanced] Four Components Guide](4_COMPONENTS_GUIDE_EN.md)**.
+> **Important Note**: `BaseHostActivity` internally overrides the `getResources()` and `getAssets()` methods to ensure plugins can seamlessly access both the host's and their own resources. It also contains the core logic required to proxy plugin `Activity` components.
 
 -----
 
 ## Step 2: Create Your First Plugin
 
-Now, let's create a real plugin module.
+### 2.1 Create a New Plugin Module and Add Dependencies
 
-### 2.1 Create a New Module and Add Dependencies
-
-In your project, create a new Android module. It can be of type `application` or `library`.
-
-> **We highly recommend using a `library` module for your plugins.**
-> **Reasons**:
->
->   * **Smaller Size**: Library modules do not include all dependencies by default, which, when
-      combined with our packaging plugin, can produce extremely lightweight APKs.
->   * **Dependency Decoupling**: Plugins will rely on the host to provide common libraries, which
-      avoids dependency conflicts and simplifies overall management.
-
-After creating the module, add a **compile-time dependency** on `comboLite-core` in the new module's
-`build.gradle.kts` file:
+In your project, create a new Android **Library** module (e.g., named `:my-plugin`). In the new module's `build.gradle.kts` file, add a **compile-time dependency** on `comboLite-core`:
 
 ```kotlin
-// in :your-plugin-module/build.gradle.kts
+// in :my-plugin/build.gradle.kts
 dependencies {
-    // Use compileOnly to indicate that this dependency is needed at compile time
-    // but will be provided by the host at runtime.
-    compileOnly(projects.comboLiteCore)
+    // Plugin modules must use compileOnly because the framework is provided by the host at runtime
+    compileOnly(projects.comboLiteCore) 
     // ... other dependencies
 }
 ```
 
 ### 2.2 Implement the Plugin Entry Class (IPluginEntryClass)
 
-Each plugin requires an entry class that implements the `IPluginEntryClass` interface, serving as
-the bridge between the plugin and the framework. This class contains the plugin's lifecycle
-callbacks, UI entry point, and dependency injection configuration.
+Each plugin needs an entry class that implements the `IPluginEntryClass` interface. This class acts as the bridge between the plugin and the framework, containing the plugin's lifecycle, UI entry point, and dependency injection configuration.
 
 ```kotlin
-// in your plugin module
+// in :my-plugin/src/main/java/com/example/myplugin/MyPluginEntry.kt
 package com.example.myplugin
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import com.combo.core.data.PluginContext
-import com.combo.core.entry.IPluginEntryClass
+import com.combo.core.api.IPluginEntryClass
+import com.combo.core.model.PluginContext
 import org.koin.core.module.Module
 import org.koin.dsl.module
 
 class MyPluginEntry : IPluginEntryClass {
 
     /**
-     * 1. (Optional) Declare Koin dependency injection modules provided by this plugin.
-     * Internal dependencies of the plugin can be defined here, and the framework will integrate them automatically.
+     * 1. (Optional) Declare the Koin dependency injection modules provided by this plugin.
+     * Internal dependencies of the plugin can be defined here, and the framework will automatically integrate and unload them.
      */
     override val pluginModule: List<Module>
         get() = listOf(
             module {
-                // e.g., single<MyPluginRepository> { MyPluginRepositoryImpl() }
+                // Example: single<MyPluginRepository> { MyPluginRepositoryImpl() }
             }
         )
-
+    
     /**
      * 2. Implement the onLoad lifecycle callback.
      * This method is called after the plugin is loaded by the framework.
      * It is the best place to perform all initialization logic.
      */
     override fun onLoad(context: PluginContext) {
-        println("Plugin [${context.pluginInfo.pluginId}] has been loaded, initializing...")
-        // Initialize database, network, global listeners, etc., here.
+        println("Plugin [${context.pluginInfo.id}] has been loaded. Initializing...")
     }
 
     /**
@@ -231,13 +185,12 @@ class MyPluginEntry : IPluginEntryClass {
      * It is the best place to perform all resource cleanup tasks.
      */
     override fun onUnload() {
-        println("Plugin [com.example.myplugin] is being unloaded, cleaning up resources...")
-        // Close database connections, unregister listeners, etc., here.
+        println("Plugin [com.example.myplugin] is being unloaded. Cleaning up resources...")
     }
 
     /**
      * 4. Implement the Content method to provide the plugin's UI entry point.
-     * This method is specifically for defining and returning the plugin's Jetpack Compose UI.
+     * This method is specifically designed to define and return the plugin's Jetpack Compose UI.
      */
     @Composable
     override fun Content() {
@@ -248,18 +201,37 @@ class MyPluginEntry : IPluginEntryClass {
 
 ### 2.3 Configure Plugin Metadata in the Manifest
 
-Finally, in the plugin module's `AndroidManifest.xml` file, use `<meta-data>` tags to provide the
-framework with the plugin's "identity information."
+In the plugin module's `src/main/AndroidManifest.xml` file, define the plugin's "identity information" using standard attributes and `<meta-data>` tags.
+
+| Attribute / Tag                                     | Required | Meaning                                           |
+|:----------------------------------------------------|:---------|:--------------------------------------------------|
+| `manifest`'s `package`                              | **Yes** | Defines the unique **ID** of the plugin.          |
+| `manifest`'s `versionCode`/`versionName`            | **Yes** | Defines the **version information** of the plugin. |
+| `<meta-data android:name="plugin.entryClass">`      | **Yes** | Specifies the full path of the plugin's **entry class**, which the framework uses to instantiate the plugin. |
+| `<meta-data android:name="plugin.description">`     | Optional | Provides a short **description** for the plugin. |
+| `application`'s `android:label`                     | Optional | The **display name** of the plugin, usable in a plugin management UI. |
+| `application`'s `android:icon`                      | Optional | The **display icon** of the plugin, usable in a plugin management UI. |
+
+**Configuration Example:**
 
 ```xml
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.myplugin"
+    android:versionCode="1"
+    android:versionName="1.0.0">
 
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
-        <meta-data android:name="plugin.id" android:value="com.example.myplugin" />
-        <meta-data android:name="plugin.version" android:value="1.0.0" />
-        <meta-data android:name="plugin.entryClass"
+    <application 
+        android:label="My First Plugin"
+        android:icon="@drawable/plugin_icon">
+    
+        <meta-data 
+            android:name="plugin.entryClass" 
             android:value="com.example.myplugin.MyPluginEntry" />
-        <meta-data android:name="plugin.description" android:value="This is my first plugin." />
+            
+        <meta-data 
+            android:name="plugin.description" 
+            android:value="This is my first amazing plugin." />
+            
     </application>
 </manifest>
 ```
@@ -268,343 +240,217 @@ framework with the plugin's "identity information."
 
 ## Step 3: Load and Run the Plugin
 
-### 3.1 Prepare the Plugin APK
+### 3.1 Prepare the Plugin APK: Automated Integration
 
-At this point, your first plugin is fully developed! Next, you need to package this module into an
-APK file. The specific methods and advanced strategies for packaging will be detailed in the *
-*[[Core] Packaging Guide](https://www.google.com/search?q=./2_PACKAGING_GUIDE.md)**.
+The `aar2apk` Gradle plugin, which accompanies `ComboLite`, provides powerful automation capabilities. The following configuration is a direct reference from the project's main `README.md`.
 
-**For this guide, we will assume you have already obtained a file named `my-plugin-release.apk` by
-packaging the plugin.**
+#### 1\. Declare the plugin module in the project root `build.gradle.kts`
 
-For quick verification, we will preload this APK file in the host's `assets/plugins` directory for loading (
-in a real-world scenario, it would typically be downloaded from a network).
+```kotlin
+// in your project's root /build.gradle.kts
+plugins {
+    // Ensure the plugin is applied via libs.versions.toml
+    alias(libs.plugins.combolite.aar2apk)
+}
 
-1. Create an `assets/plugins` folder in your host's `:app` module, under the `src/main` directory.
-2. Copy `my-plugin-release.apk` into it.
+// Declare all plugin modules here and configure unified packaging and signing strategies
+aar2apk {
+    modules {
+        module(":my-plugin") // Point to your plugin module
+        // ... add more plugin modules here if you have them
+    }
 
-> ⚠️ **Please Pay Close Attention**
->
->   * **Exact Filename Match**: Ensure the APK filename in the `assets/plugins` directory (
-      `my-plugin-release.apk`) is **identical** to the value of the `pluginApkName` variable defined
-      in your `MainActivity.kt` code.
->   * **Exact Plugin ID Match**: Ensure the `plugin.id` declared in your plugin's
-      `AndroidManifest.xml` (`com.example.myplugin`) is **identical** to the value of the `pluginId`
-      variable defined in your `MainActivity.kt`.
->   * **Correct Directory Location**: The `assets/plugins` folder should be located in your `:app` module's
-      `src/main/` directory, with the final path being `app/src/main/assets/plugins/`.
+    signing {
+        // ... configure your signing information
+    }
+}
+```
 
-### 3.2 Write the Interaction Code (Loading from Assets)
+#### 2\. Enable integration in the host app's `build.gradle.kts`
 
-Now, let's add the complete interaction logic to the host `MainActivity`.
+```kotlin
+// in your :app/build.gradle.kts
+plugins {
+    // Ensure the plugin is applied via libs.versions.toml
+    alias(libs.plugins.combolite.aar2apk)
+}
 
-<details>
-<summary>👉 Click to expand the complete `MainActivity.kt` example code</summary>
+// ... android { ... }
+
+// Configure the plugin auto-integration feature for seamless source-level debugging
+packagePlugins {
+    // When enabled, plugins declared in the root aar2apk block will be automatically packaged into the host's assets during build
+    enabled.set(true)
+    buildType.set(PackageBuildType.DEBUG) // or RELEASE
+    pluginsDir.set("plugins")             // The directory where plugins are stored within assets
+}
+
+dependencies {
+    implementation(libs.combolite.core)
+    // ...
+}
+```
+
+After completing the above configuration, every time you build or run the host app, Gradle will automatically compile and package modules like `:my-plugin` into the host APK's `assets/plugins/` directory.
+
+### 3.2 Write the Interaction Code
+
+To provide the best development experience, the sample code will differentiate between `DEBUG` and `RELEASE` build modes.
+
+* **Debug Mode**: When the app starts, it will automatically use `installPluginsFromAssetsForDebug` to **forcefully reinstall** the plugins from the `assets` directory. This ensures that you are always running the latest code, enabling seamless debugging.
+* **Release Mode**: Simulating a real-world environment, the app will check if the plugin is already installed upon launch. If not, the user will need to install the plugin through a **manual action** (such as downloading it or selecting it from local files).
+
+\<details\>
+\<summary\>👉 Click to expand the recommended MainActivity.kt sample code\</summary\>
 
 ```kotlin
 package com.combo.plugin.sample
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import com.combo.core.base.BaseHostActivity
-import com.combo.core.manager.PluginManager
-
-class HostActivity : BaseHostActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        if (super.pluginActivity == null) {
-            enableEdgeToEdge()
-            setContent {
-                val resources by PluginManager.resourcesManager.mResourcesFlow.collectAsState()
-                key(resources) {
-                    LoadingScreen()
-                }
-            }
-        }
-    }
-}
-```
-
-```kotlin
-package com.combo.plugin.sample
-
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.combo.plugin.sample.LoadingViewModel.Companion.PLUGIN_ID
-import org.koin.androidx.compose.koinViewModel
-
-/**
- * 加载页面
- *
- * 在插件框架初始化期间显示的加载界面
- */
-@Composable
-fun LoadingScreen(viewModel: LoadingViewModel = koinViewModel()) {
-    val loading by viewModel.loading.collectAsState()
-    val entryClass by viewModel.entryClass.collectAsState()
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (loading) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(48.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-
-                    Text(
-                        text = "正在初始化插件框架...",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                }
-            } else if (entryClass == null) {
-                val pluginState = viewModel.getPluginStatus(PLUGIN_ID)
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Text(
-                        text = "基础插件${
-                            when(pluginState) {
-                                PluginStatus.NOT_INSTALLED -> "未安装"
-                                PluginStatus.INSTALLED_NOT_STARTED -> "已安装但未启动"
-                                else -> "已安装且已启动"
-                            }
-                        }",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                    Button(
-                        onClick = {
-                            when(pluginState) {
-                                PluginStatus.NOT_INSTALLED -> {
-                                    viewModel.installPlugin(LoadingViewModel.BASE_PATH, true)
-                                }
-
-                                PluginStatus.INSTALLED_NOT_STARTED -> {
-                                    viewModel.launchBasePlugin()
-                                }
-
-                                else -> {
-                                    viewModel.launchBasePlugin()
-                                }
-                            }
-                        },
-                    ) {
-                        Text(
-                            text = when(pluginState) {
-                                PluginStatus.NOT_INSTALLED -> "安装插件"
-                                PluginStatus.INSTALLED_NOT_STARTED -> "启动插件"
-                                else -> "打开应用"
-                            }
-                        )
-                    }
-                }
-            } else {
-                entryClass?.Content()
-            }
-        }
-    }
-}
-```
-
-```kotlin
-package com.combo.plugin.sample
-
-import android.annotation.SuppressLint
-import android.content.Context
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.combo.core.interfaces.IPluginEntryClass
-import com.combo.core.manager.PluginManager
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import androidx.lifecycle.lifecycleScope
+import com.combo.core.api.IPluginEntryClass
+import com.combo.core.component.activity.BaseHostActivity
+import com.combo.core.runtime.PluginManager
+import com.combo.core.utils.installPluginsFromAssetsForDebug
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * 插件状态枚举
- */
-enum class PluginStatus {
-    /** 插件未安装 */
-    NOT_INSTALLED,
+class MainActivity : BaseHostActivity() {
 
-    /** 插件已安装但未启动 */
-    INSTALLED_NOT_STARTED,
+    private val pluginId = "com.example.myplugin"
+    private var pluginEntry by mutableStateOf<IPluginEntryClass?>(null)
+    private var isLoading by mutableStateOf(true)
 
-    /** 插件已安装且已启动 */
-    INSTALLED_AND_STARTED,
-}
-
-
-class LoadingViewModel(
-    context: Context,
-) : ViewModel() {
-    @SuppressLint("StaticFieldLeak")
-    private val context = context.applicationContext
-
-    private val _loading = MutableStateFlow(false)
-    val loading: StateFlow<Boolean> = _loading.asStateFlow()
-
-    private val _entryClass = MutableStateFlow<IPluginEntryClass?>(null)
-    val entryClass: StateFlow<IPluginEntryClass?> = _entryClass.asStateFlow()
-
-    companion object {
-        const val BASE_PATH = "plugins"
-        const val PLUGIN_ID = "com.example.myplugin"
-    }
-
-    init {
-        init()
-    }
-
-    fun init() {
-        viewModelScope.launch {
-            setLoading(true)
-            if (getPluginStatus(PLUGIN_ID) == PluginStatus.NOT_INSTALLED) {
-                installPlugin(BASE_PATH)
-            } else {
-                PluginManager.loadEnabledPlugins()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        setContent {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                when {
+                    isLoading -> {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(16.dp))
+                            Text("Initializing...")
+                        }
+                    }
+                    pluginEntry != null -> pluginEntry?.Content()
+                    else -> ControlScreen()
+                }
             }
-            _entryClass.value = PluginManager.getPluginInstance(PLUGIN_ID)
-            setLoading(false)
+        }
+        
+        initialize()
+    }
+
+    private fun initialize() {
+        lifecycleScope.launch {
+            if (BuildConfig.DEBUG) {
+                // Debug mode: Force reinstall on every launch to ensure the latest code
+                Toast.makeText(this@MainActivity, "Debug mode: Forcing plugin update", Toast.LENGTH_SHORT).show()
+                installPluginsFromAssetsForDebug()
+                PluginManager.loadEnabledPlugins()
+                PluginManager.launchPlugin(pluginId)
+            }
+            // Check for the plugin instance
+            pluginEntry = PluginManager.getPluginInstance(pluginId)
+            isLoading = false
         }
     }
 
-    fun setLoading(isLoading: Boolean) {
-        _loading.value = isLoading
-    }
+    @Composable
+    private fun ControlScreen() {
+        // Interaction UI for Release mode
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            val isInstalled = PluginManager.isPluginInstalled(pluginId)
+            Text(if (isInstalled) "Plugin installed but not launched" else "Plugin not installed")
 
-    fun installPlugin(
-        assetPath: String,
-        forceOverwrite: Boolean = false,
-    ) {
-        viewModelScope.launch {
-            setLoading(true)
-            val pluginFiles = context.assets.list(assetPath)
-            pluginFiles?.forEach { fileName ->
-                val pluginFile = File(context.filesDir, fileName)
-                context.assets.open("$assetPath/$fileName").use { inputStream ->
-                    FileOutputStream(pluginFile).use { outputStream ->
-                        inputStream.copyTo(outputStream)
+            if (!isInstalled) {
+                Button(onClick = {
+                    // In Release mode, you should implement your own installation logic (e.g., download)
+                    // For this quick demo, we still install from assets
+                    installManuallyFromAssets()
+                }) {
+                    Text("Install Plugin Manually")
+                }
+            } else {
+                Button(onClick = {
+                    isLoading = true
+                    lifecycleScope.launch {
+                        PluginManager.loadEnabledPlugins()
+                        PluginManager.launchPlugin(pluginId)
+                        pluginEntry = PluginManager.getPluginInstance(pluginId)
+                        isLoading = false
+                    }
+                }) {
+                    Text("Launch Plugin")
+                }
+            }
+        }
+    }
+    
+    /**
+     * Simulates the manual installation process in a Release environment.
+     * In a real-world scenario, you should download the APK file from a network, not read from assets.
+     */
+    private fun installManuallyFromAssets() {
+        isLoading = true
+        lifecycleScope.launch {
+            try {
+                // This is a mock implementation; replace it with your download and file management logic
+                val assetPath = "plugins/my-plugin-debug.apk" // Assumed path
+                val pluginFile = File(filesDir, "my-plugin.apk")
+                assets.open(assetPath).use { input ->
+                    FileOutputStream(pluginFile).use { output ->
+                        input.copyTo(output)
                     }
                 }
-                PluginManager.installerManager.installPlugin(pluginFile, forceOverwrite)
+                // Use forceOverwrite = false for the initial installation
+                PluginManager.installerManager.installPlugin(pluginFile, false)
+                Toast.makeText(this@MainActivity, "Manual installation successful", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Manual installation failed: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                isLoading = false
             }
-            PluginManager.loadEnabledPlugins()
-            _entryClass.value = PluginManager.getPluginInstance(PLUGIN_ID)
-            setLoading(false)
-        }
-    }
-
-    fun launchBasePlugin() {
-        viewModelScope.launch {
-            PluginManager.launchPlugin(PLUGIN_COMMON).let {
-                if (it) {
-                    PluginManager.getPluginInstance(PLUGIN_COMMON)
-                }
-            }
-            PluginManager.launchPlugin(PLUGIN_ID).let {
-                if (it) {
-                    _entryClass.value = PluginManager.getPluginInstance(PLUGIN_ID)
-                }
-            }
-        }
-    }
-
-    /**
-     * 获取指定插件的状态
-     *
-     * @param pluginId 插件ID
-     * @return 插件状态枚举
-     */
-    fun getPluginStatus(pluginId: String): PluginStatus {
-        // 检查插件是否已安装
-        val isInstalled = PluginManager.getAllInstallPlugins().any { it.pluginId == pluginId }
-
-        if (!isInstalled) {
-            return PluginStatus.NOT_INSTALLED
-        }
-
-        val entryClass = PluginManager.getPluginInstance(pluginId)
-
-        return if (entryClass != null) {
-            PluginStatus.INSTALLED_AND_STARTED
-        } else {
-            PluginStatus.INSTALLED_NOT_STARTED
         }
     }
 }
-
 ```
 
-</details>
+\</details\>
 
 ### 3.3 Run and Verify
 
-Now, run your host app and follow the on-screen button order:
+Now, run your host app:
 
-1. Click the **"1. Install Plugin from Assets"** button. The app will read the APK from `assets` and
-   complete the installation. You will see a "installed successfully" Toast message.
-2. Click the **"2. Launch and Display Plugin"** button. The framework will load the plugin, and the
-   text **"Hello from My First Plugin!"** will appear on the screen.
+* **In Debug mode**: You will see a brief toast message "Debug mode: Forcing plugin update," and then the plugin's UI **“Hello from My First Plugin\!”** will be displayed directly.
+* **In Release mode**: The UI will show "Plugin not installed" and a button.
+    1.  Click the **“Install Plugin Manually”** button to complete the installation.
+    2.  The UI will then update to show "Plugin installed but not launched" and a **“Launch Plugin”** button. Click it.
+    3.  Finally, you will see the plugin's UI: **“Hello from My First Plugin\!”**.
 
-After completing all the steps and clicking the buttons, your app interface should look like this:
+## Congratulations\! and Next Steps
 
-*(Please replace this path with your actual screenshot path)*
+Fantastic\! You have successfully taken the most important step and completed the full development loop for `ComboLite` plugins.
 
-## Congratulations! & Next Steps
+Next, we highly recommend you read the following documents to explore more of `ComboLite`'s powerful features:
 
-Fantastic! You have successfully completed the entire loop of `ComboLite`'s plugin development. This
-is more than just a "Hello World"; it's the key to unlocking the door to modern, dynamic app
-construction. We are proud of you!
-
-If you encounter any issues during this process, you can always refer to the complete, runnable
-quick-start sample code we have prepared for you.
-
-Now that you've mastered the basics, it's time to dive deeper into `ComboLite`'s more powerful
-features:
-
-* **[[Core] Packaging Guide](2_PACKAGING_GUIDE_EN.md)**: Learn how to properly package your plugin
-  modules into APKs.
-* **[[Advanced] Core API Usage](3_CORE_APIS_EN.md)**: Master the rich interface provided by
-  `PluginManager`.
-* **[[Advanced] Four Components Guide](4_COMPONENTS_GUIDE_EN.md)**: Give your plugins the power of
-  Activity, Service, and more.
-* **[[Principles] Architecture & Design](5_ARCHITECTURE_EN.md)**: Delve into the magic behind how
-  `ComboLite` works.
+* **[[Core] Plugin Packaging Guide](./2_PACKAGING_GUIDE_EN.md)**: Deep dive into the `aar2apk` plugin and master both packaging strategies.
+* **[[Advanced] Core API Usage](./3_CORE_APIS_EN.md)**: Master all the core features of the `PluginManager`.
+* **[[Advanced] The Four Major Components Guide](./4_COMPONENTS_GUIDE_EN.md)**: Learn how to use Activity, Service, etc., in plugins.
+* **[[Principles] Architecture & Design](./5_ARCHITECTURE_EN.md)**: Explore the internal workings of ComboLite.

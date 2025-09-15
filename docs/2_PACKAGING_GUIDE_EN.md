@@ -1,166 +1,174 @@
-# Plugin Packaging Guide
+# Plugin Packaging & Debugging Guide
 
-Welcome to the `ComboLite` Plugin Packaging Guide!
+Welcome to the `ComboLite` guide for plugin packaging and debugging!
 
-"Packaging" is the crucial step that transforms your plugin module (whether it's a `Library` or an
-`Application` type) into a standalone APK file that can be dynamically loaded, installed, and run by
-the host. Mastering the correct packaging strategy is vital for creating lightweight plugins,
-avoiding dependency conflicts, and improving project maintainability.
+"Packaging" is the crucial step of transforming your plugin module into a standalone APK file that can be dynamically loaded, installed, and run by the host. During the development phase, "debugging" efficiency directly determines your iteration speed.
 
-This guide will delve into the two packaging schemes supported by `ComboLite`, with a special focus
-on our officially recommended workflow: packaging `Library` modules using the `aar2apk` Gradle
-plugin.
+This guide will delve into the two core workflows provided by `ComboLite`:
+
+1.  **Seamless Development-Time Debugging**: Achieve real-time application of source code changes via a Gradle plugin.
+2.  **Packaging for Production**: Manually execute tasks to generate official plugin APKs for online distribution.
+
+We will focus on the workflow for `Library` modules using the `aar2apk` Gradle plugin, which is our officially recommended best practice.
 
 -----
 
 ## Core Concepts: The Foundation of Packaging Strategy
 
-Before diving into the specific operations, let's first grasp the two core concepts that determine
-your packaging strategy.
+Before we dive into specific operations, let's grasp two core concepts that determine your packaging strategy.
 
-### 1. Two Plugin Formats: Library vs. Application
+### 1. Two Plugin Forms: Library vs. Application
 
-`ComboLite` gives you great flexibility, allowing you to develop plugins from two different types of
-Android modules:
+`ComboLite` gives you immense flexibility, allowing you to develop two different forms of Android modules as plugins:
 
 * 📦 **Library Module (Recommended)**
 
-    * **Essence**: A standard `com.android.library` module (output is an AAR).
-    * **Characteristics**: Lightweight and non-standalone. It does not contain common dependencies
-      like the Kotlin standard library or AndroidX; it assumes these will be provided by the host
-      app at runtime. This is the top choice for building "Super Apps" and pursuing ultimate
-      performance.
-    * **Packaging Method**: It needs to be "promoted" into an installable APK using our provided
-      `aar2apk` Gradle plugin.
+    * **Nature**: A standard `com.android.library` module (produces an AAR).
+    * **Characteristics**: Lightweight and non-standalone. It does not include common dependencies like the Kotlin standard library or AndroidX, assuming the host app will provide them at runtime. This is the top choice for building "Super Apps" and pursuing ultimate performance.
+    * **Packaging Method**: Requires our `aar2apk` Gradle plugin to be "upgraded" into an installable APK.
 
 * 📱 **Application Module**
 
-    * **Essence**: A standard `com.android.application` module (output is an APK).
-    * **Characteristics**: Standalone and self-contained. It acts like a mini-app, packaging most of
-      its own dependencies inside it.
-    * **Packaging Method**: Uses the standard Android official build process.
+    * **Nature**: A standard `com.android.application` module (produces an APK).
+    * **Characteristics**: Standalone and self-contained. It acts like a mini-app, bundling most of its own dependencies.
+    * **Packaging Method**: Uses the standard Android official packaging process.
 
-### 2. Dependency Scopes: `compileOnly` vs. `implementation`
+### 2. Dependency Scopes: `compileOnly` vs `implementation`
 
-Correctly using Gradle's dependency scopes is the magic behind creating lightweight,
-dependency-sharing plugins.
+Correctly using Gradle's dependency scopes is the magic behind achieving "lightweight" plugins and "dependency sharing."
 
-* ✅ **`compileOnly` (Preferred for Plugins)**
+* ✅ **`compileOnly` (Plugin's First Choice)**
 
-    * **Meaning**: "Compile-time only dependency." It tells the compiler: "This library is necessary
-      to **compile my plugin code**, but please **do not** package it into the final plugin APK. I
-      promise that the host app will provide this library at runtime."
-    * **Usage**: This is the **primary and most commonly used** scope for plugin modules. All common
-      libraries you expect the host to provide (e.g., `comboLite-core`, `Kotlin`, `AndroidX`,
-      `OkHttp`) should use `compileOnly`.
+    * **Meaning**: "Compile-time only dependency." It tells the compiler: "This library is necessary to **compile my plugin code**, but please **do not** package it into the final plugin APK. I promise that the host app will provide this library at runtime."
+    * **Usage**: This is the **highest-priority and most commonly used** scope for plugin modules. All common libraries you expect the host to provide (like `comboLite-core`, `Kotlin`, `AndroidX`, `OkHttp`, etc.) should use `compileOnly`.
 
 * ⚠️ **`implementation`**
 
-    * **Meaning**: "Implementation dependency." It tells the compiler: "This library is needed for
-      both compilation and runtime, so please make sure to **package** it into the final artifact."
-    * **Usage**:
-        1. When packaging an `Application` module plugin, it's used to include the plugin's private
-           dependencies.
-        2. When packaging a `Library` module plugin, you only need to change a dependency from
-           `compileOnly` to `implementation` if you plan to use advanced features of `aar2apk` (like
-           `includeDependenciesDex`) to **intentionally** package that specific dependency.
+    * **Meaning**: "Implementation dependency." It tells the compiler: "This library is needed at both compile-time and runtime. Please make sure to **package it** into the final product."
+    * **Usage**: Only use this when an `Application` plugin or a `Library` plugin needs to package **private dependencies**.
 
 > **The Golden Rule**:
 > **For plugin development, `compileOnly` is the norm, `implementation` is the exception.**
 
 -----
 
-## Scheme 1: Packaging Library Modules (Official Recommendation)
+## Workflow One: Seamless Development-Time Debugging (Automatic Integration)
 
-This is `ComboLite`'s most central and powerful packaging method. We have built-in a Gradle plugin
-named `aar2apk` specifically designed to convert lightweight `Library` modules into fully-functional
-plugin APKs with a single command.
+This is a revolutionary experience enhancement brought by `ComboLite` v2.0, designed to completely eliminate the tedious "build-install-run" debugging cycle of traditional plugin development.
 
-### 1. Include and Apply the Plugin
+### 1. Core Principle
 
-First, ensure the `aar2apk` plugin itself can be found by your project.
+Through configuration, the `aar2apk` plugin can automatically and silently perform the following operations in the background when you click the "Run" or "Debug" button in Android Studio:
 
-① **Include the plugin project in your root `settings.gradle.kts`**:
+1.  Compile the specified plugin `Library` modules.
+2.  Package them into `debug` version APKs.
+3.  Place these APKs **directly into the `assets` directory of the host app's final build output**.
 
-```kotlin
-// in your project's /settings.gradle.kts
-includeBuild("../ComboLite") {
-    dependencySubstitution {
-        // When you depend on the aar2apk plugin in your project, Gradle will automatically 
-        // replace it with the local build-logic module.
-        substitute(module("com.combo.aar2apk")).using(project(":build-logic"))
-    }
-}
-```
+This entire process has **zero intrusion** on your project's source code. You just need to modify your code as if you were developing a regular module, click run, and all changes will take effect in the host app.
 
-② **Apply the plugin in your root `build.gradle.kts`**:
+### 2. Configuration Steps
+
+Automatic integration requires two configurations to work together: one for declaration and one for enablement.
+
+#### ① Declare Plugins in the Project Root `build.gradle.kts`
+
+This configuration is used to **tell** the `aar2apk` plugin which `Library` modules in the project are plugins to be managed.
 
 ```kotlin
 // in your project's root /build.gradle.kts
 plugins {
-    // ... other plugins
-    id("com.combo.aar2apk")
+    alias(libs.plugins.combolite.aar2apk)
+}
+
+aar2apk {
+    // a. Declare all Library modules to be packaged as plugins
+    modules {
+        module(":plugin-user")
+        module(":plugin-settings")
+        // ... Add all your plugin modules
+    }
+
+    // b. (Optional) Configure global signing information for production packaging later
+    signing {
+        keystorePath.set(rootProject.file("your_keystore.jks").absolutePath)
+        keystorePassword.set("your_password")
+        keyAlias.set("your_alias")
+        keyPassword.set("your_password")
+    }
 }
 ```
 
-### 2. Configure the Packaging Task
+#### ② Enable Integration in the Host App `build.gradle.kts`
 
-All configuration is done within the `aar2apk` block in your root `build.gradle.kts`. You can set up
-global signing information and specify individual packaging strategies for each plugin module you
-need to build.
+This configuration is used to **turn on** the automatic integration feature.
+
+```kotlin
+// in your :app/build.gradle.kts
+plugins {
+    id("io.github.lnzz123.combolite-aar2apk")
+}
+
+// Configure the plugin auto-integration feature
+packagePlugins {
+    // a. Master switch for the feature, set to true during development
+    enabled.set(true)
+
+    // b. Specify the build variant for packaging plugins (DEBUG or RELEASE)
+    buildType.set(PackageBuildType.DEBUG)
+
+    // c. The directory where plugin APKs are stored within the host's assets
+    pluginsDir.set("plugins")
+}
+
+dependencies {
+    implementation(libs.combolite.core)
+}
+```
+
+**Configuration complete!** Now, you can directly modify the code in the `:plugin-user` or `:plugin-settings` modules, then run the `:app` host. The framework will automatically load the latest plugins from your `assets/plugins/` directory for debugging.
+
+> 🔗 **Code Example**: For guidance on how to write code in your Activity to load plugins from the `assets` directory, please refer to the **[[Must Read] Quick Start](./1_QUICK_START_EN.md)** guide.
+
+-----
+
+## Workflow Two: Packaging for Production (Manual Execution)
+
+When you need to publish your plugins to a server or pre-install them, you'll need to manually execute packaging tasks to generate official `release` version APKs.
+
+### 1. Configure Packaging Strategy (Optional)
+
+Manual packaging tasks will follow the strategies you define in the `aar2apk` configuration block in your project root `build.gradle.kts`. In addition to declaring modules, you can fine-tune the dependency packaging method for each plugin.
 
 ```kotlin
 // in your project's root /build.gradle.kts
 aar2apk {
-    // a. (Optional) Configure global signing information
-    // If configured, all plugins will use this signature. Release builds must be signed.
-    signing {
-        keystorePath.set(rootProject.file("your_keystore.jks").absolutePath)
-        keystorePassword.set("your_keystore_password")
-        keyAlias.set("your_key_alias")
-        keyPassword.set("your_key_password")
-    }
+    // ... signing { ... }
 
-    // b. Declare all Library modules to be packaged as plugins
     modules {
-        // Strategy 1: Default minimal packaging (Most common)
-        // Does not package any external dependency code or resources. The plugin size is minimal.
+        // Strategy 1: Default minimal packaging (most common)
+        // Does not package any external dependency code or resources, resulting in the smallest plugin size.
         module(":plugin-user")
         module(":plugin-settings")
 
-        // Strategy 2: Package partial dependencies (For special cases)
-        // For example, :plugin-reader depends on a library A with drawable resources, and the host doesn't have library A.
+        // Strategy 2: Package partial dependencies (for special cases)
+        // For example, if :plugin-reader depends on Library A which has drawable resources, and the host doesn't have it.
         module(":plugin-reader") {
+            // Note: Library A must be included with `implementation` in :plugin-reader
             includeDependenciesRes.set(true) // Only package resources from external dependencies
-            // Note: Library A must be included with `implementation` in :plugin-reader's build file.
         }
 
-        // Strategy 3: Package all dependencies (Rarely used, high risk)
-        // Suitable for plugins that depend on a completely private library that neither the host nor other plugins have.
+        // Strategy 3: Package all dependencies (rarely used, high risk)
+        // Suitable when a plugin depends on a completely private library that neither the host nor other plugins have.
         module(":plugin-private") {
-            includeAllDependencies() // Convenience method, equivalent to setting the four below to true
-
-            // Or use fine-grained control
-            // includeDependenciesDex.set(true)    // Package dependency code
-            // includeDependenciesRes.set(true)    // Package dependency resources
-            // includeDependenciesAssets.set(true) // Package dependency assets
-            // includeDependenciesJni.set(true)    // Package dependency JNI libraries
+            includeAllDependencies() // Convenience method, same as setting the four options below to true
         }
     }
 }
 ```
 
-### 3. Available Packaging Commands (Gradle Tasks)
+### 2. Execute Packaging Tasks (Gradle Tasks)
 
-Once configured, the `aar2apk` plugin will automatically generate a series of convenient Gradle
-tasks for your project.
-
-You can find them in the **Android Studio Gradle task panel** (usually on the right side) under the
-`Plugin APKs` group. Double-click to execute them.
-
-*(Please replace this with your actual screenshot)*
-
-Alternatively, you can execute the following commands in your terminal:
+The `aar2apk` plugin automatically generates a series of convenient Gradle tasks for your project. You can find them in the `Plugin APKs` group in the **Gradle task panel of Android Studio**. Double-click to execute, or run the command in the terminal.
 
 ```bash
 # [Recommended] Build all configured Library plugins in one go (Release version)
@@ -175,139 +183,80 @@ Alternatively, you can execute the following commands in your terminal:
 # Build a single plugin (Debug version)
 ./gradlew :plugin-user:buildDebugPluginApk
 
-# Clean all plugin build artifacts (APKs, logs, temporary files)
+# Clean all plugin build artifacts (APKs, logs, temp files)
 ./gradlew cleanAllPluginApks
 ```
 
-The packaged artifacts will be located in your project's root `build/outputs/plugin-apks/`
-directory, automatically sorted into `debug` and `release` subfolders.
-
-### 4. Pros and Cons
-
-* ✅ **Pros**:
-    * **Extremely Lightweight**: The APK size is typically only tens to hundreds of KB, making
-      update and download costs very low.
-    * **Eliminates Dependency Conflicts**: All plugins share the same dependencies provided by the
-      host, fundamentally avoiding runtime crashes caused by version mismatches.
-    * **Unified Dependency Management**: Dependency versions are upgraded and managed centrally by
-      the host, reducing maintenance costs.
-* ⚠️ **Cons**:
-    * **Relies on Host Environment**: The plugin's execution is heavily dependent on the host. If
-      the host fails to provide a dependency declared with `compileOnly`, the plugin will fail to
-      start due to a `ClassNotFoundException` and will be automatically disabled by the framework's
-      fusing mechanism.
+The build artifacts will be located in the project root's `build/outputs/plugin-apks/` folder, automatically categorized into `debug` and `release`.
 
 -----
 
-## Scheme 2: Packaging Application Modules (Alternative)
+## Alternative Approach: Packaging Application Modules
 
-Using a standard `com.android.application` module as a plugin is a traditional method that is still
-useful in specific scenarios.
+Using a standard `com.android.application` module as a plugin is a traditional method that is still useful in certain scenarios.
 
 ### 1. Configuration Steps
 
-**① Add the Core Dependency**
-In the plugin module's `build.gradle.kts`, declare the framework's core library as `compileOnly`.
+**① Add Core Dependency**: In the `build.gradle.kts`, declare the framework core library as `compileOnly`.
 
-```kotlin
-// in your-application-plugin/build.gradle.kts
-dependencies {
-    compileOnly(projects.comboLiteCore)
-    // This gson library will be packaged into the plugin APK
-    implementation("com.google.code.gson:gson:2.9.0")
-}
-```
-
-**② (❗Critically Important) Configure Package ID**
-To avoid resource ID conflicts (`R.java`) with the host or other plugins, you **must** manually
-specify a unique `Package ID` for each `Application` plugin module.
+**② (❗Extremely Important) Configure Package ID**: To avoid resource ID conflicts (`R.java`) with the host or other plugins, you **must** manually specify a unique `Package ID` for each `Application` plugin module.
 
 ```kotlin
 // in your-application-plugin/build.gradle.kts
 android {
     // ...
     aaptOptions {
-        // This hexadecimal value must be unique among all Application plugins
-        additionalParameters("--package-id", "0x80")
+        // This hex value must be unique across all Application plugins (0x02 ~ 0x7E)
+        additionalParameters("--package-id", "0x70") 
     }
 }
 ```
 
-> **Note**: The valid range for `Package ID` is from `0x02` to `0x7F`. The host app's ID is `0x7F`.
-> Please assign a different value from this range to each of your Application plugins. For example,
-> Plugin A uses `0x7E`, Plugin B uses `0x7D`, and so on.
-
 ### 2. Execute Packaging
 
-You can complete the packaging using the standard tasks provided by AGP.
-
-```bash
-./gradlew :your-application-plugin:assembleRelease
-```
+Use the standard task provided by AGP to complete the packaging: `./gradlew :your-application-plugin:assembleRelease`
 
 ### 3. Pros and Cons
 
-* ✅ **Pros**:
-    * **Highly Independent**: The plugin is self-contained with all its dependencies, making
-      deployment simple as it doesn't rely on the host's external environment.
-    * **No Compatibility Worries**: No need to worry about whether the host provides the required
-      libraries or versions that the plugin needs.
-* ⚠️ **Cons**:
-    * **Larger Size**: Since all dependencies are packaged, the plugin APK will be relatively
-      bloated.
-    * **Potential Dependency Risks**: If the libraries packaged in the plugin conflict with the
-      versions in the host, it can lead to hard-to-debug runtime errors.
+* ✅ **Pros**: Highly independent, simple deployment, no compatibility headaches.
+* ⚠️ **Trade-offs**: Larger size, and potential risk of dependency version conflicts.
 
 -----
 
 ## How to Choose?
 
-| Use Case                                                                | Recommended Scheme             | Rationale                                                                                                         |
-|:------------------------------------------------------------------------|:-------------------------------|:------------------------------------------------------------------------------------------------------------------|
-| **UI component libraries, utility classes, common business**            | **✅ Library Module (aar2apk)** | **Preferred choice**. Single-purpose, small size, suitable for frequent updates and reuse as a shared resource.   |
-| **"Super App" with a large number of plugins**                          | **✅ Library Module (aar2apk)** | Maximizes reuse of common dependencies, significantly reducing the app's total size and memory footprint.         |
-| **Extreme requirements for update speed and size**                      | **✅ Library Module (aar2apk)** | The tiny package size makes the experience of dynamic delivery and hot-updating almost seamless.                  |
-| **Large, independent functional modules** (e.g., shopping, game center) | **⚠️ Application Module**      | Complex business logic with many dependencies, requiring high cohesion and independence.                          |
-| **Plugins provided for third-party integration**                        | **⚠️ Application Module**      | The host environment cannot be controlled, so all dependencies must be self-contained to ensure stable operation. |
+| Scenario | Recommended Approach | Reason |
+|:---|:---|:---|
+| **UI component libraries, utility classes, common business logic** | **✅ Library Module (aar2apk)** | **Top choice**. Single-purpose, small size, suitable for frequent updates and reuse as shared resources. |
+| **"Super App" with a large number of plugins** | **✅ Library Module (aar2apk)** | Maximizes reuse of common dependencies, significantly reducing the overall app size and memory footprint. |
+| **Extreme requirements for plugin update speed and size** | **✅ Library Module (aar2apk)** | The tiny package size makes the experience of dynamic delivery and hot-updates almost imperceptible. |
+| **Large, independent feature modules** (e.g., shopping, game center) | **⚠️ Application Module** | Complex business logic, numerous dependencies, requires high cohesion and independence. |
+| **Plugins provided for third-party integration** | **⚠️ Application Module** | Cannot control the host environment; must be self-contained with all dependencies to ensure stable operation. |
 
 -----
 
-## Important Practices and Risk Warnings
+## Important Practices & Risk Warnings
 
-### Deep Dive Warning: Be Cautious About Packaging Full Dependencies
+### Deep Warning: Be Cautious About Packaging Full Dependencies
 
-Although the `aar2apk` plugin provides the capability to package dependencies (code, resources, JNI,
-etc.) into a plugin via `includeAllDependencies()`, this should be considered an **alternative
-solution for special cases, not a routine operation**.
+Although the `aar2apk` plugin provides capabilities like `includeAllDependencies()` to bundle dependencies into the plugin, this should be considered a **fallback for special cases, not a routine operation**.
 
-> **In the vast majority of cases, we strongly recommend you use the default minimal packaging mode.
-**
+> **In the vast majority of cases, we strongly recommend you use the default minimal packaging mode.**
 
-Packaging full dependencies can introduce a series of severe and hard-to-diagnose problems:
+Packaging full dependencies can introduce a series of serious and hard-to-diagnose problems:
 
-* **Class Duplication Conflicts**: If a plugin packages `OkHttp 4.9.0`, while the host or another
-  plugin uses `OkHttp 4.10.0`, the runtime may crash with fatal errors like `NoSuchMethodError` or
-  `ClassCastException` due to inconsistent class definitions.
-* **Resource Duplication and Overwriting**: If multiple plugins or the host contain resources with
-  the same name, the resource loaded at runtime might not be the one you expect, leading to UI
-  glitches.
-* **APK Size Bloat**: Repackaging the same dependency libraries repeatedly will significantly
-  increase the plugin APK's size and the final application's total size.
+* **Class Duplication Conflicts**: If a plugin packages `OkHttp 4.9.0`, while the host or another plugin uses `OkHttp 4.10.0`, you may encounter fatal crashes at runtime like `NoSuchMethodError` or `ClassCastException` due to inconsistent class definitions.
+* **Resource Duplication and Overwriting**: If multiple plugins or the host contain resources with the same name, the resource loaded at runtime might not be what you expect, leading to UI glitches.
+* **APK Size Bloat**: Repeatedly packaging the same dependency libraries will significantly increase the plugin APK size and the total size of the final application.
 
-**Rule of Thumb**: Only consider packaging a dependency if you are **absolutely certain** that it is
-**exclusively private** to this plugin and will not conflict with the host or any other plugin.
+**Rule of Thumb**: Only consider packaging a dependency if you are **absolutely certain** that it is **exclusively private** to this plugin and will not conflict with the host or any other plugin.
 
-### Special Note: Impact of UI Technology Choice on Packaging
+### Special Note: Impact of UI Technology Choice on Packaging Strategy
 
-In a plugin context, your choice of UI technology (Jetpack Compose or XML) will directly impact the
-complexity of your packaging.
+In a pluginized scenario, your choice of UI construction technology (Jetpack Compose or XML) directly affects the complexity of packaging.
 
-* **Jetpack Compose (Recommended)**: Perfectly compatible with `ComboLite`'s `compileOnly`
-  dependency-sharing strategy, with almost no compatibility issues.
-* **XML Layouts**: In `compileOnly` mode, you will face **difficulties with cross-module resource
-  references**, which can lead to build failures or require more complex packaging configurations.
+* **Jetpack Compose (Recommended)**: Perfectly aligns with `ComboLite`'s `compileOnly` dependency sharing strategy with virtually no compatibility issues.
+* **XML Layouts**: In `compileOnly` mode, there are difficulties with **cross-module resource references**, which may lead to build failures or require more complex packaging configurations.
 
-> **We strongly recommend you prioritize using Jetpack Compose in your plugins**.
-> For an in-depth discussion of the specific problems you might encounter with XML and their
-> solutions, please refer to the "UI Implementation Technology Choice" section in the *
-*[[Advanced] Four Components Guide](4_COMPONENTS_GUIDE_EN.md)**.
+> **We strongly recommend prioritizing Jetpack Compose in your plugins.**
+> For an in-depth discussion of the specific issues you might encounter with XML and their solutions, please refer to the "UI Implementation Technology Choice" section in the **[[Advanced] The Four Major Components Guide](./4_COMPONENTS_GUIDE_EN.md)**.
