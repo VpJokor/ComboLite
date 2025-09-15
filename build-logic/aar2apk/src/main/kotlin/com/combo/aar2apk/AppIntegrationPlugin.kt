@@ -20,6 +20,7 @@ import com.android.build.api.variant.AndroidComponentsExtension
 import com.combo.aar2apk.tasks.PreparePluginAssetsTask
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.tasks.Delete
 import org.gradle.kotlin.dsl.register
 
 /**
@@ -49,6 +50,18 @@ class AppIntegrationPlugin : Plugin<Project> {
                         )
                         return@onVariants
                     }
+
+                    val cleanTaskName = "clean${pluginBuildType.name.replaceFirstChar { it.uppercase() }}PluginApksOutput"
+                    val outputDirToClean = project.rootProject.layout.buildDirectory.dir("outputs/plugin-apks/${pluginBuildType.name.lowercase()}")
+
+                    val cleanTask = project.rootProject.tasks.findByName(cleanTaskName)
+                        ?: project.rootProject.tasks.register<Delete>(cleanTaskName) {
+                            group = "Plugin Packaging"
+                            description = "清理旧的 [${pluginBuildType.name}] 插件 APKs 输出目录"
+                            delete(outputDirToClean)
+                        }.get()
+
+                    rootBuildPluginsTask.dependsOn(cleanTask)
 
                     val variantCapitalized = variant.name.replaceFirstChar { it.uppercase() }
                     val taskName = "packagePluginsToIntermediateAssetsFor$variantCapitalized"

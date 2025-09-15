@@ -32,26 +32,26 @@ aar2apk {
     modules {
         module(":sample-plugin:common")
         module(":sample-plugin:home")
-//        module(":sample-plugin:guide")
-//        module(":sample-plugin:example")
-//        module(":sample-plugin:setting")
+        module(":sample-plugin:guide")
+        module(":sample-plugin:example")
+        module(":sample-plugin:setting")
     }
 
     // 配置签名信息
 
     // 测试签名
-    signing {
-        keystorePath.set(rootProject.file("test.jks").absolutePath)
-        keystorePassword.set("12345678")
-        keyAlias.set("test")
-        keyPassword.set("12345678")
-    }
+//    signing {
+//        keystorePath.set(rootProject.file("test.jks").absolutePath)
+//        keystorePassword.set("12345678")
+//        keyAlias.set("test")
+//        keyPassword.set("12345678")
+//    }
 
     // 宿主签名
-//    signing {
-//        keystorePath.set(rootProject.file("jctech.jks").absolutePath)
-//        keystorePassword.set("he1755858138")
-//        keyAlias.set("jctech")
-//        keyPassword.set("he1755858138")
-//    }
+    signing {
+        keystorePath.set(rootProject.file("jctech.jks").absolutePath)
+        keystorePassword.set("he1755858138")
+        keyAlias.set("jctech")
+        keyPassword.set("he1755858138")
+    }
 }

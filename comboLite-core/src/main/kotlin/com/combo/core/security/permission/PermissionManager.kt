@@ -36,16 +36,6 @@ enum class PermissionLevel {
 }
 
 /**
- * 定义了插件权限检查的结果。
- */
-enum class PermissionResult {
-    GRANTED,
-    DENIED,
-    NEEDS_USER_CONSENT
-}
-
-
-/**
  * 静态权限检查器
  *
  * 负责根据预设规则（如签名、调用者ID）进行无UI的权限检查。
@@ -78,8 +68,8 @@ internal class PermissionManager(private val context: Application) {
             ?: return false
 
         return when (requiredLevel) {
-            PermissionLevel.HOST -> hasHostSignature(callingPluginInfo.path)
-            PermissionLevel.SELF -> callingPluginId == targetPluginId
+            HOST -> hasHostSignature(callingPluginInfo.path)
+            SELF -> callingPluginId == targetPluginId || hasHostSignature(callingPluginInfo.path)
         }
     }
 

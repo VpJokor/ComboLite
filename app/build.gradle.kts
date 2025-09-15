@@ -23,7 +23,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.aar2apk)
+//    alias(libs.plugins.aar2apk)
+    id("io.github.lnzz123.combolite-aar2apk")
 }
 
 android {

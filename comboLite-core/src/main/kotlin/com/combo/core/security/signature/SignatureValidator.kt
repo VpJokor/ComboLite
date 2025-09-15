@@ -44,44 +44,6 @@ internal object SignatureValidator {
     private var hostSignatureDigestsCache: Set<String>? = null
 
     /**
-     * 校验插件APK的签名是否与宿主App一致。
-     *
-     * @param context 上下文
-     * @param pluginApkFile 插件APK文件
-     * @return `true` 如果签名一致，否则返回 `false`
-     */
-    fun validate(context: Context, pluginApkFile: File): Boolean {
-        if (!pluginApkFile.exists()) {
-            Timber.tag(TAG).w("插件文件不存在: %s", pluginApkFile.absolutePath)
-            return false
-        }
-
-        // 1. 获取并缓存宿主签名摘要
-        val hostDigests = getHostSignatures(context)
-        if (hostDigests.isEmpty()) {
-            Timber.tag(TAG).e("无法获取宿主签名，校验中止。")
-            return false
-        }
-
-        // 2. 获取插件签名摘要
-        val pluginDigests = getPluginSignatures(context, pluginApkFile.absolutePath)
-        if (pluginDigests.isEmpty()) {
-            Timber.tag(TAG).e("无法从 %s 获取插件签名，校验失败。", pluginApkFile.name)
-            return false
-        }
-
-        // 3. 比对签名摘要集合 (插件签名必须是宿主签名的子集)
-        val isValid = hostDigests.containsAll(pluginDigests)
-        Timber.tag(TAG).i(
-            "签名校验结果 for '%s': %s",
-            pluginApkFile.name,
-            if (isValid) "成功" else "失败",
-        )
-
-        return isValid
-    }
-
-    /**
      * 获取宿主 App 的所有签名摘要 (SHA-256)。
      * 结果会被缓存以提高后续调用的性能。
      *
