@@ -57,6 +57,8 @@ As the Android ecosystem evolves, plugin frameworks born in the View era are str
 
 > 🔗 **Download Sample App**: [https://github.com/lnzz123/ComboLite/tree/master/app/release/app-release.apk](https://raw.githubusercontent.com/lnzz123/ComboLite/refs/heads/master/app/release/app-release.apk)
 >
+> > <img src="image/preview.gif" width="250" alt="核心功能演示"/>
+> 
 > **(Note: Plugin APKs are hosted on GitHub. If the download is slow or fails, please try using a VPN.)**
 
 -----

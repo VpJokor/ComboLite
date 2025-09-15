@@ -71,7 +71,7 @@ class HostApp : BaseHostApplication(), IPluginCrashCallback {
                 setHostProviderAuthority("com.combo.plugin.sample.provider")
             }
 
-            setValidationStrategy(ValidationStrategy.Insecure)
+            setValidationStrategy(ValidationStrategy.UserGrant)
             PluginCrashHandler.setGlobalClashCallback(this@HostApp)
         }
     }

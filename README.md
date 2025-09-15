@@ -60,7 +60,11 @@
 
 > 🔗 **下载示例App**: [https://github.com/lnzz123/ComboLite/tree/master/app/release/app-release.apk](https://raw.githubusercontent.com/lnzz123/ComboLite/refs/heads/master/app/release/app-release.apk)
 >
+> <img src="image/preview.gif" width="250" alt="核心功能演示"/>
+>
 > **(说明：插件 APK 托管于 GitHub，若下载缓慢或失败，请尝试开启 VPN。)**
+
+
 
 -----
 
