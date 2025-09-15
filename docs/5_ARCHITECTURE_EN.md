@@ -1,361 +1,221 @@
-# Architecture & Design Principles
+# Architecture & Design Principles (v2.0)
 
-Welcome to the core of `ComboLite`!
+Welcome to the inner workings of `ComboLite`!
 
-This document aims to unveil the internal working mechanisms and core design philosophies of
-`ComboLite`. By understanding the framework's underlying principles, you will be better able to
-leverage its features and perform more efficient diagnostics when encountering issues.
+This document aims to unveil the internal mechanisms and core design philosophies of `ComboLite` v2.0. By understanding the framework's underlying principles, you will be better able to leverage its features and diagnose issues more efficiently when they arise.
 
-`ComboLite`'s design philosophy is rooted in three cornerstones:
+The design philosophy of `ComboLite` v2.0 is rooted in three cornerstones:
 
-* **Ultimate Stability**: Completely abandoning non-public APIs (Hooks & Reflection) and using 100%
-  officially recommended mechanisms to ensure the framework's long-term compatibility and
-  reliability.
-* **Embracing Modernity**: Natively designed for Jetpack Compose and Kotlin Coroutines, keeping in
-  sync with the latest Android development toolchains.
-* **Simplicity and Transparency**: Maintaining a concise and clear core logic to reduce the learning
-  curve and secondary development costs for developers.
+* **Ultimate Stability**: Completely abandoning non-public APIs (Hooks & reflection) and using 100% officially recommended mechanisms to ensure the framework's long-term compatibility and reliability.
+* **Embracing Modernity**: Natively designed for Jetpack Compose and Kotlin Coroutines, keeping pace with the latest Android development toolchain.
+* **Security & Simplicity**: Introducing fine-grained permission control and flexible authorization mechanisms while maintaining the simplicity and clarity of the core logic to reduce the learning and secondary development costs for developers.
 
 -----
 
-## I. High-Level Architecture
+### I. High-Level Architecture
 
-`ComboLite` employs a simple yet powerful micro-kernel design, with several core managers working in
-concert, each with its own responsibilities.
+`ComboLite` v2.0 adopts a concise and powerful micro-kernel design. An internal context (`PluginFrameworkContext`) holds all the core managers, each with its own responsibilities, which are coordinated and exposed externally by a single commander, `PluginManager`.
+
+#### Internal Component Interaction
 
 ```mermaid
 graph TD
     subgraph "Host App & System"
-        HostApp[Host App Code] -- invokes API --> PM(PluginManager)
-        AndroidSystem[Android System] -- interacts with --> HostProxies["Host Proxy Components<br>(HostActivity, HostService...)"]
+        HostApp[Host App Code] -- Calls API --> PM(PluginManager)
+        AndroidSystem[Android System] -- Interacts with --> HostProxies["Host Proxy Components<br>(HostActivity, HostService...)"]
     end
 
-    subgraph "ComboLite Core Managers"
-        PM -- orchestrates --> IM(InstallerManager)
-        PM -- orchestrates --> RM(ResourceManager)
-        PM -- orchestrates --> ProxyM(ProxyManager)
-        PM -- orchestrates --> DM(DependencyManager)
+    subgraph "ComboLite Core Services"
+        PM -- Coordinates --> Installer(InstallerManager)
+        PM -- Coordinates --> ResManager(PluginResourcesManager)
+        PM -- Coordinates --> ProxyM(ProxyManager)
+        PM -- Coordinates --> DepManager(DependencyManager)
+        PM -- Coordinates --> Lifecycle(PluginLifecycleManager)
+        PM -- Coordinates --> Security(Security Managers)
     end
     
-    subgraph "Data & State"
+    subgraph "Runtime & Data State"
         OnDiskState["On-Disk State<br>plugins.xml, APKs"]
-        InMemoryState["In-Memory State<br>LoadedPlugins, ClassLoaders, Instances"]
-        ClassIndex["Global Class Index<br>Map<Class, PluginId>"]
-        DepGraph["Dependency Graphs<br>(Forward & Reverse)"]
+        InMemoryState["In-Memory State<br>Loaded Plugins, ClassLoaders, Instances"]
+        ClassIndex["Global Class Index<br>Map<Class, PluginID>"]
+        DepGraph["Dependency Graph<br>(Forward & Reverse)"]
         MergedRes["Merged Resources"]
     end
+
+    subgraph "Security System"
+        Security -- Includes --> PermManager(PermissionManager)
+        Security -- Includes --> AuthManager(AuthorizationManager)
+        Security -- Includes --> Validator(SignatureValidator)
+    end
     
-    %% --- Manager Responsibilities ---
-    IM -- "Manages" --> OnDiskState
+    %% --- Responsibility Links ---
+    Installer -- "Manages" --> OnDiskState
     PM -- "Manages" --> InMemoryState
-    PM -- "Builds & Owns" --> ClassIndex
-    DM -- "Builds & Owns" --> DepGraph
-    RM -- "Creates & Owns" --> MergedRes
+    PM -- "Builds & Holds" --> ClassIndex
+    DepManager -- "Builds & Holds" --> DepGraph
+    ResManager -- "Creates & Holds" --> MergedRes
     ProxyM -- "Manages" --> HostProxies
     
-    %% --- Key Interactions ---
-    subgraph "Key Interaction: ClassLoader Delegation"
+    %% --- Key Interaction: ClassLoader Delegation ---
+    subgraph "Key Interaction: Cross-Plugin Class Lookup"
         direction LR
         style RequesterPCL fill:#f9f,stroke:#333,stroke-width:2px
         style TargetPCL fill:#ccf,stroke:#333,stroke-width:2px
         
-        RequesterPCL["Requester<br>PluginClassLoader"] -- "findClass() on miss" --> DM
-        DM -- "1. lookup" --> ClassIndex
-        DM -- "2. record dependency" --> DepGraph
-        DM -- "3. load from" --> TargetPCL["Target<br>PluginClassLoader"]
+        RequesterPCL["Requester<br>PluginClassLoader"] -- "Delegates on findClass() failure" --> DepManager
+        DepManager -- "1. Look up index" --> ClassIndex
+        DepManager -- "2. Record dependency" --> DepGraph
+        DepManager -- "3. Load from target" --> TargetPCL["Target<br>PluginClassLoader"]
     end
     
-    InMemoryState -- contains --> RequesterPCL
-    InMemoryState -- contains --> TargetPCL
+    InMemoryState -- Contains --> RequesterPCL & TargetPCL
 ```
 
-* **`PluginManager` (The Master Controller)**: The framework's supreme commander and sole singleton
-  entry point. It is responsible for coordinating all other managers and controlling the **runtime
-  state** (loading, instantiation, unloading) of all plugins.
-* **`InstallerManager` (The Installer)**: The administrator of the plugin's "physical world." It
-  handles the installation, update, and uninstallation processes, manages the storage of plugin APKs
-  on disk, and maintains a metadata manifest (`plugins.xml`) of all installed plugins.
-* **`ResourceManager` (The Resource Manager)**: The plugin's "visual" engine. It provides a unified
-  `Resources` object by merging the resources of all loaded plugins, allowing the host and plugins
-  to access any resource transparently.
-* **`ProxyManager` (The Dispatcher)**: The "lifecycle agent" for the four major components. It is
-  responsible for managing the host-side proxy components (like `HostActivity`, `HostService` pool)
-  and correctly dispatching intents from the Android system to the corresponding plugin components.
-* **`DependencyManager` (The Dependency Manager)**: The "relationship map" between plugins. It
-  dynamically analyzes the dependencies between plugins during loading, constructing a directed
-  graph to support "chain restart" and cross-plugin class lookups.
+* **`PluginManager` (Main Controller)**: The framework's supreme commander and sole singleton entry point. It is responsible for coordinating all other managers and controlling the **runtime state** of all plugins.
+* **`InstallerManager` (Installer)**: The administrator of the plugin's "physical world." It handles the installation, update, and uninstallation processes, manages the storage of plugin APKs on disk, and maintains a metadata registry of all installed plugins (`plugins.xml`).
+* **`PluginLifecycleManager` (Lifecycle Manager)**: A new manager introduced in v2.0, specifically responsible for core lifecycle operations such as plugin loading, instantiation, launching, unloading, and reloading, resulting in more cohesive logic.
+* **`ResourceManager` (Resource Manager)**: The plugin's "visual" engine. It provides a unified `Resources` object by merging the resources of all loaded plugins.
+* **`ProxyManager` (Dispatcher)**: The "lifecycle proxy" for the four major components. It manages the proxy components on the host side and correctly dispatches system intents to the corresponding plugin components.
+* **`DependencyManager` (Dependency Manager)**: The "relationship graph" between plugins. It dynamically analyzes inter-plugin dependencies during loading, constructing a directed graph that provides data support for "chain restart" and cross-plugin class lookups.
+* **`Security System`**: A core upgrade in v2.0. This is a cluster of managers, including:
+    * `SignatureValidator`: Responsible for signature validation.
+    * `PermissionManager`: Responsible for **static permission checks**.
+    * `AuthorizationManager`: Responsible for **dynamic authorization coordination**, serving as the main entry point for permission requests.
 
 -----
 
-## II. Core Workflow: The Life of a Plugin
+### II. Core Workflow: A Plugin's Life Journey
 
-Let's follow a plugin, starting from an APK file, through its entire lifecycle within `ComboLite`.
+Let's follow a plugin through its complete lifecycle within `ComboLite` v2.0.
 
 #### 1. Installation
 
 When you call `PluginManager.installerManager.installPlugin(apkFile)`:
 
-1. **Security Check**: `InstallerManager` first verifies that the **digital signature** of the
-   `apkFile` matches that of the host app.
-2. **Metadata Parsing**: Next, it parses the APK's `AndroidManifest.xml` to extract core metadata
-   like `plugin.id`, `plugin.version`, etc., and validates them.
-3. **Version Comparison**: If a plugin with the same ID already exists, it compares the version
-   numbers, preventing downgrades by default.
-4. **File Persistence**: After successful validation, `InstallerManager` copies the APK file to the
-   application's private directory `/data/data/your.package/files/plugins/` and renames it, for
-   example, to `com.example.myplugin.plugin`.
-5. **Information Registration**: Finally, all of the plugin's metadata (including parsed static
-   broadcasts and Provider info) is written to the application's "plugin registry"—the
-   `/data/data/your.package/files/plugins.xml` file.
+1.  **Security Check**: `InstallerManager` first validates the plugin based on the `ValidationStrategy` set in `PluginManager`.
+    * `Strict`: The signature must be identical to the host's.
+    * `UserGrant`: If the signature is different, it requests user authorization via a UI presented by `AuthorizationManager`.
+    * `Insecure`: Skips validation (for development use only).
+2.  **Metadata Parsing**: It parses the APK's `AndroidManifest.xml` to extract standard attributes like `package` (used as the plugin ID), `versionCode`, and `label` (plugin name).
+3.  **Version Comparison**: If a plugin with the same ID already exists, it compares version codes, prohibiting downgrades by default.
+4.  **File Persistence & Class Index Generation**:
+    * The APK file is copied to the app's private directory, e.g., `/data/data/your.package/files/plugins/com.example.myplugin/base.apk`.
+    * It uses the `dexlib2` library to scan this APK, extract all class names, and generate a `class_index` text file within the plugin's directory. This index is key to achieving `O(1)` complexity for cross-plugin class lookups.
+5.  **Component Parsing & Information Registration**: It parses static broadcasts and provider information declared in the plugin, and finally writes all metadata into the app's "plugin registry" — the `plugins.xml` file.
 
-#### 2. Loading
+#### 2. Loading & Instantiation
 
-When you call `PluginManager.launchPlugin("com.example.myplugin")`:
+When you call `PluginManager.launchPlugin("com.example.myplugin")`, the request is forwarded to `PluginLifecycleManager`:
 
-1. **Create Runtime Cache**: `PluginManager` first copies the plugin's persistent file to a
-   temporary runtime cache directory (`/cache/plugins_runtime/`) and sets it to **read-only**. This
-   is to avoid Android system warnings about writable `dex` files and to isolate each runtime
-   instance.
-2. **Build Class Index**: The framework uses the `dexlib2` library to scan this cached APK, extracts
-   all class names, and builds a global `Map<ClassName, PluginId>` index. This index is key to
-   achieving `O(1)` complexity for cross-plugin class lookups.
-3. **Load Resources**: `ResourceManager` is called. It dynamically "merges" the resources from the
-   plugin APK into the host's current `Resources` object, based on the Android system version (using
-   `ResourcesLoader` for API 30+ and reflection for older versions).
-4. **Create ClassLoader**: A dedicated `PluginClassLoader` instance is created for the plugin. It
-   holds the path to the plugin and is responsible for subsequent class loading.
-5. **Register Load Information**: A `LoadedPluginInfo` object, containing the plugin info,
-   ClassLoader, etc., is created and stored in the `PluginManager`'s `loadedPluginsFlow` state.
+1.  **Create ClassLoader**: A dedicated `PluginClassLoader` instance is created for the plugin. It holds the path to the plugin and relies on `DependencyManager` for cross-plugin class lookups.
+2.  **Load Class Index**: The framework reads all class names from the `class_index` file in the plugin's directory and loads them into a global `ConcurrentHashMap<ClassName, PluginId>` index.
+3.  **Load Resources & Register Components**: `ResourceManager` merges the plugin's resources into the host; `ProxyManager` registers the plugin's static broadcasts and providers in memory.
+4.  **Save Loading Information**: A `LoadedPluginInfo` object, containing plugin info, the ClassLoader, etc., is created and stored in `PluginManager`'s `loadedPluginsFlow` state.
+5.  **Instantiate Entry Class**: `PluginLifecycleManager` uses the `PluginClassLoader` to load and instantiate the plugin's entry class (`IPluginEntryClass`).
+6.  **Dependency Injection & Lifecycle Callback**: If the plugin provides Koin modules, the framework automatically loads them. Then, the `onLoad()` method of the entry class instance is called.
+7.  **Save Instance**: The plugin instance is stored in the `pluginInstancesFlow` state. At this point, the plugin is fully ready.
 
-#### 3. Instantiation
+#### 3. Unloading
 
-1. **Instantiate Entry Class**: `PluginManager` uses the newly created `PluginClassLoader` to load
-   and instantiate the entry class (`IPluginEntryClass`) declared in the plugin's
-   `AndroidManifest.xml`.
-2. **Dependency Injection**: If the plugin provides Koin modules, the framework automatically loads
-   them into the global Koin container.
-3. **Lifecycle Callback**: The `onLoad()` method of the entry class instance is called, with a
-   `PluginContext` passed in.
-4. **Save Instance**: The plugin instance is stored in the `pluginInstancesFlow` state. At this
-   point, the plugin is fully ready and can provide its services.
+When you call `PluginManager.unloadPlugin("com.example.myplugin")`, `PluginLifecycleManager` executes the above process in reverse:
 
-#### 4. Unloading
-
-When you call `PluginManager.unloadPlugin("com.example.myplugin")`, the above process is reversed:
-
-1. The `onUnload()` method is called.
-2. Koin modules are unloaded.
-3. The four major components are unregistered from `ProxyManager`.
-4. Resources are removed from `ResourceManager`.
-5. All classes of the plugin are removed from the global class index.
-6. The records are removed from `loadedPluginsFlow` and `pluginInstancesFlow`.
-7. The `PluginClassLoader` is discarded for garbage collection.
-8. The runtime cache file is deleted.
+1.  Calls the `onUnload()` method.
+2.  Unloads Koin modules.
+3.  Unregisters the four major components from `ProxyManager`.
+4.  Removes resources from `ResourceManager`.
+5.  Removes all of the plugin's classes from the global class index.
+6.  Removes records from `loadedPluginsFlow` and `pluginInstancesFlow`.
+7.  Discards the `PluginClassLoader` to be garbage collected.
 
 -----
 
-## III. The Four Components: Implementation Principles
+### III. Implementation Principles of the Four Major Components
 
-#### Activity
+The implementation of the four major components is still based on the **Proxy Pattern**. V2.0 has optimized and reinforced this foundation, but the core idea remains the same.
 
-Employs a **single placeholder proxy** model.
+> **Core Flow**:
+>
+> 1.  **Host-Side Configuration**: Register real proxy components (like `HostActivity`, `HostService`) in the host's `Manifest` and inform `ProxyManager` of their `Class` or `Authority`.
+> 2.  **Framework-Level Interception**: When an extension function like `startPluginActivity` is called, the framework creates an `Intent` pointing to the host proxy component and puts the real plugin component's class name as an extra.
+> 3.  **Proxy-Side Dispatch**: After the host proxy component (e.g., `HostActivity`) is launched, it retrieves the plugin class name from the `Intent` and uses the plugin's `ClassLoader` to reflectively instantiate an implementation object of an interface like `IPluginActivity`.
+> 4.  **Lifecycle Delegation**: The proxy component calls the plugin object's `onAttach(this)` to inject the proxy context, then forwards all subsequent lifecycle events (`onResume`, `onPause`, etc.) one by one to this plugin instance.
 
-1. **Configuration**: You need to register a real `Activity` (e.g., `HostActivity`) that inherits
-   from `BaseHostActivity` in the host's `Manifest`.
-2. **Launch**: When you call `startPluginActivity(PluginActivity.class)`, the framework creates an
-   `Intent` targeting the host's `HostActivity` but passes the real plugin `Activity` class name
-   `"com.example.PluginActivity"` as an extra.
-3. **Proxying**: The Android system starts `HostActivity`. In its `onCreate` method, it retrieves
-   the class name from the `Intent` extra, instantiates the `IPluginActivity` object via the
-   plugin's `ClassLoader`, calls its `onAttach(this)` to inject the proxy, and then manually calls
-   its `onCreate()` and forwards all subsequent lifecycle events (`onResume`, `onPause`, etc.) to
-   this plugin `Activity` instance.
-
-#### Service
-
-Employs a **proxy service pool** model.
-
-1. **Configuration**: You need to register **multiple** real `Service` classes (e.g.,
-   `HostService1`, `HostService2`...) in the host's `Manifest` and configure their `Class` list into
-   the `ProxyManager`'s service pool.
-2. **Launch**: When you call `startPluginService(PluginService.class, instanceId)`, `ProxyManager`
-   fetches an **idle** `HostService` from the pool (e.g., `HostService2`) and binds the `instanceId`
-   to it. The framework then creates an `Intent` targeting `HostService2`, passing the real plugin
-   `Service` class name and `instanceId` as extras, and the system starts `HostService2`.
-3. **Proxying**: After `HostService2` starts, it similarly instantiates the plugin `Service` and
-   forwards all lifecycle events. When `HostService2` is destroyed, it notifies `ProxyManager` to
-   return itself to the available pool for the next plugin `Service` to use.
-
-#### BroadcastReceiver
-
-Employs a **centralized proxy dispatch** model.
-
-* **Static Broadcasts**:
-    1. **Parsing**: During plugin **installation**, `InstallerManager` parses its `Manifest` to
-       extract all `<receiver>` information (including `intent-filter`) and stores it in
-       `plugins.xml`.
-    2. **Registration**: During plugin **loading**, `PluginManager` registers this information into
-       an in-memory registry in `ProxyManager`.
-    3. **Receiving**: The **single** `HostReceiver` that you registered in the host's `Manifest`
-       receives all system broadcasts.
-    4. **Dispatching**: `HostReceiver` passes the received `Intent` to `ProxyManager`.
-       `ProxyManager` then queries its internal registry to find all plugin `Receivers` that match
-       the `Intent`, instantiates them one by one, and calls their `onReceive` methods.
-
-#### ContentProvider
-
-Employs a **URI proxy** model.
-
-1. **Configuration**: You need to register a real `HostProvider` with a **unique Authority** (e.g.,
-   `com.host.proxy.provider`) in the host's `Manifest`.
-2. **Invocation**: When you call `queryPlugin(pluginUri)`, the extension function uses
-   `buildProxyUri` to "transform" a plugin `Uri` (e.g., `content://plugin.auth/books`) into a proxy
-   `Uri` (e.g., `content://com.host.proxy.provider/plugin.auth/books`).
-3. **Proxying**: The system's `ContentResolver` sends the request to `HostProvider`. Upon receiving
-   the request, `HostProvider` parses the original plugin `Authority` (`plugin.auth`) from the proxy
-   `Uri`'s path, finds the corresponding real `ContentProvider` instance via `ProxyManager`, and
-   forwards the request (using the original `Uri`) to the actual plugin `Provider` for processing.
+* **Activity**: Uses a **Single Placeholder Proxy** model.
+* **Service**: Uses a **Proxy Service Pool** model.
+* **BroadcastReceiver**: Uses a **Centralized Proxy Dispatch** model.
+* **ContentProvider**: Uses a **URI Proxy** model.
 
 -----
 
-## IV. Key Mechanism Deep Dive
+### IV. In-depth Analysis of Key Mechanisms
 
-This section delves into some of `ComboLite`'s most distinctive designs, revealing their underlying
-implementation principles.
+#### 1. Dynamic Dependency Discovery & Class Loading Delegation
 
-### 1. Dynamic Dependency Discovery & ClassLoader Delegation
+This is the core mechanism through which `ComboLite` achieves its "zero-configuration dependency" and "lightning-fast class lookup" features. It is accomplished by the collaboration of three components: the **Global Class Index**, `PluginClassLoader`, and `DependencyManager`.
 
-This is the core mechanism through which `ComboLite` achieves its "zero-configuration dependency"
-and "lightning-fast class lookup" features. It is accomplished through the collaboration of three
-components: the **Global Class Index**, the **`PluginClassLoader`**, and the **`DependencyManager`
-**.
+> **Workflow**: "**Local Lookup -> Delegate to Arbiter -> Index-based Location -> Record Dependency -> Targeted Loading**".
+>
+> 1.  Plugin A's `PluginClassLoader`, in its `findClass` method, first tries to find the class in its local `dex` file via `super.findClass()`.
+> 2.  If it fails and catches a `ClassNotFoundException`, it does **not** immediately throw it. Instead, it "delegates" the lookup task to `DependencyManager`.
+> 3.  `DependencyManager`, as an implementation of the `IPluginFinder` interface, queries the **global class index** and discovers that the class belongs to Plugin B.
+> 4.  `DependencyManager` dynamically records the `A -> B` dependency relationship in its internal **two dependency graphs**.
+> 5.  `DependencyManager` then gets Plugin B's `ClassLoader` and calls its **`findClassLocally`** method. This method directly calls `super.findClass()`, thus loading the required class directly from Plugin B's `dex` file and returning it to Plugin A. `findClassLocally` does **not** delegate again, preventing infinite recursion.
+> 6.  Only if `DependencyManager` also fails to find the class will the `PluginClassLoader` throw a special `PluginDependencyException`.
 
-#### **Step 1: Global Class Index (The "Map") - O(1) Lookup**
+#### 2. Dependency Graph & Chain Restart
 
-During plugin loading, `PluginManager` uses the `dexlib2` library to scan the plugin APK and builds
-a global `ConcurrentHashMap<ClassName, PluginId>` index. This index acts like a global phonebook,
-clearly mapping "which class lives in which plugin." It optimizes the class lookup complexity from
-`O(n)` in traditional plugin frameworks to `O(1)` hash lookups.
+**"Chain Restart"** is `ComboLite`'s core safety mechanism for ensuring state consistency after a hot-update. Its implementation relies entirely on the **reverse dependency graph (`dependentGraph`)** dynamically built by `DependencyManager` at runtime.
 
-#### **Step 2: `PluginClassLoader` (The "Requester") - Initiating the Request**
+> **How it works**:
+>
+> 1.  **Trigger**: When `PluginManager.launchPlugin("plugin-B")` is called on an already loaded plugin B, `PluginLifecycleManager` recognizes it as a "restart" request.
+> 2.  **Query Dependents**: `PluginLifecycleManager` immediately calls `dependencyManager.findDependentsRecursive("plugin-B")`.
+> 3.  **Graph Traversal**: The `findDependentsRecursive` method performs a **Depth-First Search (DFS)** on the **reverse dependency graph**, starting from the `plugin-B` node, to find all plugins (e.g., `A` and `C`) that directly or indirectly depend on `plugin-B`.
+> 4.  **Formulate Restart Plan**: The search result is merged with the trigger point to form a complete restart list, e.g., `[A, C, B]`.
+> 5.  **Execute Plan**: `PluginLifecycleManager` will strictly **unload** these plugins in **reverse dependency order** (first `A` and `C`, then `B`), and then **reload** them in **forward order**, ensuring the entire dependency chain is updated consistently.
 
-Each plugin has its own `PluginClassLoader`. When code in Plugin A tries to load a class (e.g.,
-`new ClassFromPluginB()`), its `ClassLoader` executes its overridden `findClass` method:
+#### 3. **New: Permission & Authorization Mechanism (v2.0 Core)**
 
-1. **Local Search**: First, like a normal `ClassLoader`, it searches for the class within its own
-   `dex` file.
-2. **Search Failure**: If not found locally, it does **not** immediately throw a
-   `ClassNotFoundException`. Instead, it "delegates" the search task to the `DependencyManager`.
-3. **Final Failure**: Only if the `DependencyManager` also fails to find the class does the
-   `PluginClassLoader` throw a special `PluginDependencyException`, which carries the ID of the "
-   culprit plugin." This exception is the key signal for implementing the "crash fusing" mechanism.
+This is the most significant architectural upgrade in v2.0, designed to provide enterprise-grade security for the framework.
 
-#### **Step 3: `DependencyManager` (The "Arbiter") - Arbitration and Recording**
+1.  **Annotation-based Declaration**: The framework uses the `@RequiresPermission` annotation to declare the required permission level (`HOST` or `SELF`) and failure mode (`hardFail`) for sensitive APIs in core classes like `PluginManager` (e.g., `setPluginEnabled`).
+2.  **Caller Tracking**: When a plugin calls these sensitive APIs, the `checkApiCaller` extension function accurately identifies the calling plugin's ID by analyzing the call stack (`Thread.currentThread().stackTrace`) and cross-referencing it with the global class index.
+3.  **Static Permission Check**: `AuthorizationManager` first wraps the call information into an `AuthorizationRequest` and passes it to `PermissionManager` for a **static check**. `PermissionManager` makes a quick judgment based on strict rules (e.g., for a `HOST`-level API, does the caller's signature digest match the host's cached digest?).
+4.  **Dynamic User Authorization**: If the static check fails and the API is not marked with `hardFail=true`, `AuthorizationManager` forwards the request to an implementation of the `IAuthorizationHandler` interface. By default, `DefaultAuthorizationHandler` launches a built-in `AuthorizationActivity` to display the operation details to the user and request their consent. The host can also replace this default UI by calling `setAuthorizationHandler` to implement a fully custom authorization flow.
 
-As the implementation of the `IPluginFinder` interface, the `DependencyManager` acts as the "
-arbiter" of the entire process. When it receives a class lookup request from Plugin A:
+This closed-loop process of "**Annotation Declaration -> Static Check -> Dynamic Authorization**" builds a robust and flexible security defense for `ComboLite`.
 
-1. **Query Index**: It uses the class name to query the **global class index** and discovers that
-   the class belongs to Plugin B.
-2. **Record Dependency**: This is the most crucial step! `DependencyManager` dynamically records
-   this dependency relationship in its **two internal dependency graphs**:
-    * **Forward Dependency Graph**: `dependencyGraph` records `A -> B` (A depends on B).
-    * **Reverse Dependency Graph**: `dependentGraph` records `B <- A` (B is depended on by A).
-3. **Targeted Loading**: `DependencyManager` then retrieves Plugin B's `ClassLoader` and calls its
-   `findClassLocally` method to directly load the required class from Plugin B's `dex` file,
-   returning it to Plugin A. `findClassLocally` does not delegate again, thus avoiding infinite
-   recursion.
+#### 4. Crash Fusing & Self-Healing
 
-This closed loop of "**Local Search -> Delegate to Arbiter -> Index Lookup -> Record Dependency ->
-Targeted Loading**" elegantly achieves a fully dynamic, on-demand dependency recording system,
-requiring no manual configuration from the developer.
+This is `ComboLite`'s "last line of defense," refactored and enhanced in v2.0.
 
-### 2. Dependency Graph & Chain Restart
-
-**"Chain Restart"** is `ComboLite`'s core safety mechanism to ensure state consistency after a hot
-update. Its implementation relies entirely on the **reverse dependency graph (`dependentGraph`)**
-dynamically built by the `DependencyManager` at runtime.
-
-**How it works**:
-
-1. **Trigger**: When you call `PluginManager.launchPlugin("plugin-B")` on an already loaded Plugin
-   B, the framework identifies it as a "restart" request.
-2. **Query Dependents**: `PluginManager` immediately calls
-   `dependencyManager.findDependentsRecursive("plugin-B")`.
-3. **Graph Traversal**: The `findDependentsRecursive` method performs a **Depth-First Search (DFS)**
-   on the **reverse dependency graph**, starting from the `plugin-B` node, to find all plugins that
-   directly or indirectly depend on `plugin-B` (e.g., `A` and `C`, where `C` depends on `A`, and `A`
-   depends on `B`).
-4. **Formulate Restart Plan**: The search result `[A, C]` is merged with the trigger point `B` to
-   form a complete restart list `[A, B, C]`.
-5. **Execute Plan**: `PluginManager` strictly follows the **reverse order of dependency** (first
-   `C`, then `A`, finally `B`) to **unload** these plugins, and then reloads them in the **correct
-   forward order**.
-
-This automated, graph-traversal-based process ensures that an update to any underlying plugin will
-cause all of its upstream dependents to be updated as well, thereby completely eliminating runtime
-crashes caused by the mixing of old and new code.
-
-### 3. Crash Fusing & Self-Healing
-
-This is `ComboLite`'s "last line of defense," designed to prevent the entire application from
-getting stuck in a crash loop due to a single plugin's dependency issue (e.g., forgetting to provide
-a library after a host upgrade).
-
-**How it works**:
-
-1. **Signal**: When a `PluginClassLoader` fails to find a class anywhere, it throws a
-   `PluginDependencyException`. This exception is the **sole signal** that triggers the fusing
-   mechanism.
-2. **Capture**: `PluginCrashHandler` registers itself as the global uncaught exception handler via
-   `Thread.setDefaultUncaughtExceptionHandler` at app startup. Its `uncaughtException` method
-   catches all unhandled exceptions.
-3. **Precise Identification**: It recursively traverses the exception chain (`Throwable.cause`),
-   specifically looking for `PluginDependencyException`. If it's another type of crash (like
-   `NullPointerException`), it passes the exception to the system's default handler, allowing the
-   app to crash normally.
-4. **Execute Fusing**: Once a `PluginDependencyException` is identified, the handler will:
-    * Extract the ID of the "culprit plugin" (`culpritPluginId`) from the exception object.
-    * Call `PluginManager.setPluginEnabled(culpritPluginId, false)`, **persistently** changing the
-      plugin's startup state to disabled.
-    * Launch a friendly `CrashActivity` error page to inform the user that a functional module has
-      been temporarily disabled and guide them to restart the app, instead of letting the app crash
-      or enter a restart loop.
-
-Through this process of "**Specific Exception Signal -> Global Capture -> Precise Identification ->
-Automatic Disabling -> Friendly Prompt**," `ComboLite` transforms a potentially fatal error that
-could paralyze the application into an isolated, auto-recoverable, and localized issue, greatly
-enhancing the application's robustness.
+> **How it works**:
+>
+> 1.  **Signal**: When a `PluginClassLoader` throws a `PluginDependencyException`, this is the key **signal** to trigger the fuse.
+> 2.  **Capture & Identify**: `PluginCrashHandler`, as the global exception handler, catches all unhandled exceptions and accurately identifies if they are caused by plugin-related exceptions like `PluginDependencyException`.
+> 3.  **Tiered Delegation**: The handler first checks if the crashed plugin has registered its own dedicated `IPluginCrashCallback`. If so, it delegates the handling to it. If not, it checks if the host has registered a **global callback**.
+> 4.  **Default Fusing**: If no callback handles the exception, `PluginCrashHandler` executes the default fusing logic: it launches a user-friendly `CrashActivity` that guides the user to **disable the offending plugin and restart the app**. This achieves self-healing and prevents the app from getting stuck in an infinite crash loop.
 
 -----
 
-## V. Key Design Decisions
+### V. Key Design Decisions
 
-* **Why Zero Hooks?**
-  For **ultimate stability and future compatibility**. As the Android system increasingly restricts
-  non-public APIs, any hook-based solution faces a significant risk of failing on new system
-  versions. `ComboLite` chose a more "difficult" but correct path, relying entirely on official
-  public APIs and the proxy pattern. While it trades a small amount of flexibility (e.g., for
-  complex `launchMode`s), it gains rock-solid long-term reliability in return.
+* **Why 0 Hooks?**
 
-* **Why the Class Index?**
-  For **lightning-fast cross-plugin class lookup performance**. Traditional plugin frameworks often
-  need to traverse a linked list of multiple `ClassLoader`s to find a class, an `O(n)` operation
-  that performs poorly with a large number of plugins. `ComboLite` pre-scans all classes at plugin
-  load time and builds a global `HashMap` index, reducing the time complexity of class lookups to
-  `O(1)` and ensuring the application runs smoothly.
+  > For **ultimate stability and future compatibility**. Android is increasingly restricting non-public APIs, and any solution based on Hooks faces a huge risk of failing on new system versions. `ComboLite` chose a "harder" but more correct path, relying entirely on official public APIs and the proxy pattern. While this involves trade-offs in some extreme scenarios (like complex `launchMode`), it provides rock-solid long-term reliability in return.
+
+* **Why is a Class Index Needed?**
+
+  > For **lightning-fast cross-plugin class lookup performance**. Traditional plugin frameworks often need to traverse a linked list of multiple `ClassLoader`s to find a class across plugins, which is an `O(n)` operation. By pre-scanning all classes with `dexlib2` during installation and building a global `HashMap` index, `ComboLite` reduces the time complexity of class lookups to `O(1)`, ensuring smooth application performance.
 
 * **Why "Chain Restart"?**
-  For **state consistency after hot updates**. In a complex dependency web, updating a low-level
-  core plugin without restarting its upstream dependents can easily lead to crashes like
-  `NoSuchMethodError` caused by mixed old and new code. The `Chain Restart` mechanism uses
-  `DependencyManager` to automatically analyze all affected plugins and updates them as a single "
-  atomic operation," fundamentally eliminating state inconsistency issues.
+
+  > For **state consistency after hot-updates**. In complex dependency relationships, updating a low-level core plugin without restarting the upstream plugins that depend on it can easily lead to crashes like `NoSuchMethodError` due to the mix of old and new code. The `Chain Restart` mechanism uses `DependencyManager` to automatically identify all affected plugins and updates them as a whole in an "atomic operation," fundamentally eliminating state inconsistency issues.
+
+* **Why Introduce the v2.0 Security System?**
+
+  > For **enterprise-grade robustness and openness**. The implicit trust model of v1.0 was too fragile to support an open plugin ecosystem. The v2.0 security system makes building an open "plugin marketplace" possible: the host can confidently allow users to install plugins from unknown sources because all high-risk operations are firmly controlled by the permission system. The final decision always rests with the user, achieving a perfect balance between security and flexibility.
 
 * **Why Merged Resources, Not Isolated?**
-  For an **excellent developer experience**. Strict resource isolation is extremely complex to
-  implement and often unnecessary in most scenarios. `ComboLite`'s merged resource management allows
-  developers to "forget" the origin of a resource and use resources from any plugin transparently,
-  just as they would in a monolithic application. This greatly simplifies plugin development and UI
-  collaboration. Of course, this also requires developers to follow good resource naming conventions
-  to avoid conflicts.
+
+  > For a **superior developer experience**. Implementing strict resource isolation is extremely complex and, in most scenarios, unnecessary. `ComboLite`'s merged resource management allows developers to "forget" the origin of resources and use them transparently from any plugin, just like in a monolithic app. This greatly simplifies plugin development and UI collaboration. Of course, this also requires developers to follow good resource naming conventions to avoid conflicts.

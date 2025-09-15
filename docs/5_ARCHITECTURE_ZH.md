@@ -1,296 +1,221 @@
-# 架构与设计原理
+# 架构与设计原理 (v2.0)
 
 欢迎深入 `ComboLite` 的内核！
 
-本篇文档旨在揭示 `ComboLite` 的内部工作机制和核心设计理念。通过理解框架的底层原理，你将能更好地利用其特性，并在遇到问题时进行更高效的诊断。
+本篇文档旨在揭示 `ComboLite` v2.0 的内部工作机制和核心设计理念。通过理解框架的底层原理，你将能更好地利用其特性，并在遇到问题时进行更高效的诊断。
 
-`ComboLite` 的设计哲学根植于三大基石：
+`ComboLite` v2.0 的设计哲学根植于三大基石：
 
 * **极致稳定 (Stability)**：彻底抛弃非公开 API (Hook & 反射)，100% 使用官方推荐的机制，确保框架的长期兼容性和可靠性。
-* **拥抱现代 (Modernity)**：原生为 Jetpack Compose 和 Kotlin Coroutines 设计，与最新的 Android
-  开发工具链保持同步。
-* **简单透明 (Simplicity)**：保持核心逻辑的简洁与清晰，降低开发者的理解和二次开发成本。
+* **拥抱现代 (Modernity)**：原生为 Jetpack Compose 和 Kotlin Coroutines 设计，与最新的 Android 开发工具链保持同步。
+* **安全透明 (Security & Simplicity)**：引入了精细化的权限管控和灵活的授权机制，同时保持核心逻辑的简洁与清晰，降低开发者的理解和二次开发成本。
 
----
+-----
 
-## 一、宏观架构 (High-Level Architecture)
+### 一、宏观架构 (High-Level Architecture)
 
-`ComboLite` 采用简洁而强大的微核设计，由几个各司其职的核心管理器协同工作。
+`ComboLite` v2.0 采用简洁而强大的微核设计，由一个内部上下文 (`PluginFrameworkContext`) 持有所有各司其职的核心管理器，由最高指挥官 `PluginManager` 统一对外协调。
+
+#### 内部组件交互
 
 ```mermaid
 graph TD
     subgraph "宿主应用 & 系统"
-        HostApp[宿主应用代码] -- 调用 API --> PM(插件管理器)
+        HostApp[宿主应用代码] -- 调用 API --> PM(PluginManager)
         AndroidSystem[Android 系统] -- 与...交互 --> HostProxies["宿主代理组件<br>(HostActivity, HostService...)"]
     end
 
-    subgraph "ComboLite 核心管理器"
-        PM -- 协调 --> IM(安装器)
-        PM -- 协调 --> RM(资源管理器)
-        PM -- 协调 --> ProxyM(调度器)
-        PM -- 协调 --> DM(依赖管理器)
+    subgraph "ComboLite 核心服务"
+        PM -- 协调 --> Installer(InstallerManager)
+        PM -- 协调 --> ResManager(PluginResourcesManager)
+        PM -- 协调 --> ProxyM(ProxyManager)
+        PM -- 协调 --> DepManager(DependencyManager)
+        PM -- 协调 --> Lifecycle(PluginLifecycleManager)
+        PM -- 协调 --> Security(Security Managers)
     end
     
-    subgraph "数据 & 状态"
+    subgraph "运行时 & 数据状态"
         OnDiskState["磁盘状态<br>plugins.xml, APKs"]
         InMemoryState["内存状态<br>已加载插件, 类加载器, 实例"]
         ClassIndex["全局类索引<br>Map<类, 插件ID>"]
         DepGraph["依赖图<br>(正向 & 反向)"]
         MergedRes["合并后的资源"]
     end
+
+    subgraph "安全体系 (Security)"
+        Security -- 包含 --> PermManager(PermissionManager)
+        Security -- 包含 --> AuthManager(AuthorizationManager)
+        Security -- 包含 --> Validator(SignatureValidator)
+    end
     
-    %% --- 管理器职责 ---
-    IM -- "管理" --> OnDiskState
+    %% --- 职责关联 ---
+    Installer -- "管理" --> OnDiskState
     PM -- "管理" --> InMemoryState
     PM -- "构建 & 持有" --> ClassIndex
-    DM -- "构建 & 持有" --> DepGraph
-    RM -- "创建 & 持有" --> MergedRes
+    DepManager -- "构建 & 持有" --> DepGraph
+    ResManager -- "创建 & 持有" --> MergedRes
     ProxyM -- "管理" --> HostProxies
     
-    %% --- 关键交互 ---
-    subgraph "关键交互: 类加载器委托"
+    %% --- 关键交互: 类加载器委托 ---
+    subgraph "关键交互: 跨插件类查找"
         direction LR
         style RequesterPCL fill:#f9f,stroke:#333,stroke-width:2px
         style TargetPCL fill:#ccf,stroke:#333,stroke-width:2px
         
-        RequesterPCL["请求方<br>插件类加载器"] -- "findClass()查找失败时" --> DM
-        DM -- "1. 查找" --> ClassIndex
-        DM -- "2. 记录依赖" --> DepGraph
-        DM -- "3. 从...加载" --> TargetPCL["目标<br>插件类加载器"]
+        RequesterPCL["请求方<br>PluginClassLoader"] -- "findClass() 失败时委托" --> DepManager
+        DepManager -- "1. 查索引" --> ClassIndex
+        DepManager -- "2. 记录依赖" --> DepGraph
+        DepManager -- "3. 从目标加载" --> TargetPCL["目标<br>PluginClassLoader"]
     end
     
-    InMemoryState -- 包含 --> RequesterPCL
-    InMemoryState -- 包含 --> TargetPCL
+    InMemoryState -- 包含 --> RequesterPCL & TargetPCL
 ```
 
-* **`PluginManager` (总控制器)**: 框架的最高指挥官和唯一的单例入口。它负责协调其他所有管理器，并掌管所有插件的
-  **运行时状态**（加载、实例化、卸载）。
-* **`InstallerManager` (安装器)**: 插件的“物理世界”管理员。负责插件的安装、更新、卸载流程，管理插件 APK
-  在磁盘上的存储，并维护所有已安装插件的元数据清单 (`plugins.xml`)。
-* **`ResourceManager` (资源管理器)**: 插件的“视觉”引擎。它通过合并所有已加载插件的资源，提供一个统一的
-  `Resources` 对象，让宿主和插件可以透明地访问任何资源。
-* **`ProxyManager` (调度器)**: 四大组件的“生命周期代理人”。它负责管理宿主端的代理组件（如
-  `HostActivity`、`HostService` 池），并将 Android 系统的意图（Intent）正确地分发给对应的插件组件。
-* **`DependencyManager` (依赖管理器)**:
-  插件间的“关系图谱”。它在插件加载时动态分析插件间的依赖关系，构建出一个有向图，为“链式重启”和跨插件类查找提供数据支持。
+* **`PluginManager` (总控制器)**: 框架的最高指挥官和唯一的单例入口。它负责协调其他所有管理器，并掌管所有插件的 **运行时状态**。
+* **`InstallerManager` (安装器)**: 插件的“物理世界”管理员。负责插件的安装、更新、卸载流程，管理插件 APK 在磁盘上的存储，并维护所有已安装插件的元数据清单 (`plugins.xml`)。
+* **`PluginLifecycleManager` (生命周期管理器)**: v2.0 中新增的管理者，专门负责插件的加载、实例化、启动、卸载和重载等核心生命周期操作，逻辑更内聚。
+* **`ResourceManager` (资源管理器)**: 插件的“视觉”引擎。通过合并所有已加载插件的资源，提供一个统一的 `Resources` 对象。
+* **`ProxyManager` (调度器)**: 四大组件的“生命周期代理人”。负责管理宿主端的代理组件，并将系统意图（Intent）正确地分发给对应的插件组件。
+* **`DependencyManager` (依赖管理器)**: 插件间的“关系图谱”。在插件加载时动态分析插件间的依赖关系，构建出一个有向图，为“链式重启”和跨插件类查找提供数据支持。
+* **`Security System` (安全体系)**: v2.0 的核心升级。这是一个管理器集群，包含了：
+    * `SignatureValidator`: 负责签名校验。
+    * `PermissionManager`: 负责**静态权限检查**。
+    * `AuthorizationManager`: 负责**动态授权协调**，是权限请求的总入口。
 
 -----
 
-## 二、核心工作流：一个插件的生命之旅
+### 二、核心工作流：一个插件的生命之旅
 
-让我们跟随一个插件，从一个 APK 文件开始，走完它在 `ComboLite` 中的完整生命周期。
+让我们跟随一个插件，走完它在 `ComboLite` v2.0 中的完整生命周期。
 
-#### 1\. 安装 (Installation)
+#### 1. 安装 (Installation)
 
 当你调用 `PluginManager.installerManager.installPlugin(apkFile)` 时：
 
-1. **安全检查**: `InstallerManager` 首先会校验 `apkFile` 的**数字签名**是否与宿主 App 一致。
-2. **元数据解析**: 接着，它会解析 APK 的 `AndroidManifest.xml`，提取出 `plugin.id`、`plugin.version`
-   等核心元数据，并进行合法性校验。
-3. **版本对比**: 如果同 ID 的插件已存在，它会比较版本号，默认禁止降级覆盖。
-4. **文件持久化**: 验证通过后，`InstallerManager` 将 APK 文件复制到应用私有目录
-   `/data/data/your.package/files/plugins/` 下，并重命名为如 `com.example.myplugin.plugin`。
-5. **信息注册**: 最后，将插件的所有元数据（包括解析出的静态广播、Provider 信息）写入应用的“插件户口本”——
-   `/data/data/your.package/files/plugins.xml` 文件中。
+1.  **安全检查**: `InstallerManager` 首先会根据 `PluginManager` 中设置的 `ValidationStrategy` (签名校验策略) 来校验插件。
+    * `Strict`: 必须与宿主签名一致。
+    * `UserGrant`: 如果签名不一致，则通过 `AuthorizationManager` 弹出 UI 请求用户授权。
+    * `Insecure`: 跳过校验（仅限开发时使用）。
+2.  **元数据解析**: 解析 APK 的 `AndroidManifest.xml`，提取出 `package` (作为插件ID)、`versionCode`、`label` (插件名) 等标准属性。
+3.  **版本对比**: 如果同 ID 的插件已存在，它会比较版本号，默认禁止降级覆盖。
+4.  **文件持久化与类索引生成**:
+    * 将 APK 文件复制到应用私有目录，如 `/data/data/your.package/files/plugins/com.example.myplugin/base.apk`。
+    * 使用 `dexlib2` 库扫描这个 APK，提取出其中所有的类名，并生成一个 `class_index` 文本文件，存放在插件目录中。这个索引是实现 `O(1)` 复杂度跨插件类查找的关键。
+5.  **组件解析与信息注册**: 解析插件中声明的静态广播、Provider 信息，最后将所有元数据写入应用的“插件户口本”——`plugins.xml` 文件中。
 
-#### 2\. 加载 (Loading)
+#### 2. 加载与实例化 (Loading & Instantiation)
 
-当你调用 `PluginManager.launchPlugin("com.example.myplugin")` 时：
+当你调用 `PluginManager.launchPlugin("com.example.myplugin")` 时，请求会被转发给 `PluginLifecycleManager`：
 
-1. **创建运行时缓存**: `PluginManager` 首先将插件的持久化文件复制到一个临时的运行时缓存目录 (
-   `/cache/plugins_runtime/`)，并将其设为**只读**。这是为了避免 Android 系统对可写 `dex`
-   文件的安全警告，并隔离每次运行实例。
-2. **建立类索引**: 框架使用 `dexlib2` 库扫描这个缓存 APK，提取出其中所有的类名，并建立一个全局的
-   `Map<ClassName, PluginId>` 索引。这个索引是实现 `O(1)` 复杂度跨插件类查找的关键。
-3. **加载资源**: `ResourceManager` 被调用，它根据 Android 系统版本（API 30+ 使用 `ResourcesLoader`
-   ，低版本使用反射）将插件 APK 中的资源动态地“合并”到宿主当前的 `Resources` 对象中。
-4. **创建类加载器**: 一个为该插件专属的 `PluginClassLoader` 实例被创建。它持有插件的路径，并负责后续的类加载工作。
-5. **注册加载信息**: 一个包含插件信息、ClassLoader 等数据的 `LoadedPluginInfo` 对象被创建，并存入
-   `PluginManager` 的 `loadedPluginsFlow` 状态中。
+1.  **创建类加载器**: 为该插件专属的 `PluginClassLoader` 实例被创建。它持有插件的路径，并依赖 `DependencyManager` 进行跨插件类查找。
+2.  **加载类索引**: 框架从插件目录下的 `class_index` 文件中读取所有类名，并加载到一个全局的 `ConcurrentHashMap<ClassName, PluginId>` 索引中。
+3.  **加载资源与注册组件**: `ResourceManager` 将插件资源合并到宿主中；`ProxyManager` 将插件的静态广播和 Provider 注册到内存。
+4.  **保存加载信息**: 一个包含插件信息、ClassLoader 等数据的 `LoadedPluginInfo` 对象被创建，并存入 `PluginManager` 的 `loadedPluginsFlow` 状态中。
+5.  **实例化入口类**: `PluginLifecycleManager` 使用 `PluginClassLoader` 来加载并实例化插件的入口类 (`IPluginEntryClass`)。
+6.  **依赖注入与生命周期回调**: 如果插件提供了 Koin 模块，框架会自动加载它们。随后，调用入口类实例的 `onLoad()` 方法。
+7.  **保存实例**: 插件实例被存入 `pluginInstancesFlow` 状态中，此时插件已完全就绪。
 
-#### 3\. 实例化 (Instantiation)
+#### 3. 卸载 (Unloading)
 
-1. **实例化入口类**: `PluginManager` 使用刚刚创建的 `PluginClassLoader` 来加载并实例化插件
-   `AndroidManifest.xml` 中声明的入口类 (`IPluginEntryClass`)。
-2. **依赖注入**: 如果插件提供了 Koin 模块，框架会自动加载它们到全局 Koin 容器中。
-3. **生命周期回调**: 调用入口类实例的 `onLoad()` 方法，并传入 `PluginContext`。
-4. **保存实例**: 插件实例被存入 `pluginInstancesFlow` 状态中，此时插件已完全就绪，可以对外提供服务。
+当你调用 `PluginManager.unloadPlugin("com.example.myplugin")` 时，`PluginLifecycleManager` 会逆序执行上述过程：
 
-#### 4\. 卸载 (Unloading)
-
-当你调用 `PluginManager.unloadPlugin("com.example.myplugin")` 时，上述过程将被逆序执行：
-
-1. 调用 `onUnload()` 方法。
-2. 卸载 Koin 模块。
-3. 从 `ProxyManager` 中注销四大组件。
-4. 从 `ResourceManager` 中移除资源。
-5. 从全局类索引中移除该插件的所有类。
-6. 从 `loadedPluginsFlow` 和 `pluginInstancesFlow` 中移除记录。
-7. 废弃 `PluginClassLoader` 等待GC。
-8. 删除运行时缓存文件。
+1.  调用 `onUnload()` 方法。
+2.  卸载 Koin 模块。
+3.  从 `ProxyManager` 中注销四大组件。
+4.  从 `ResourceManager` 中移除资源。
+5.  从全局类索引中移除该插件的所有类。
+6.  从 `loadedPluginsFlow` 和 `pluginInstancesFlow` 中移除记录。
+7.  废弃 `PluginClassLoader` 等待 GC。
 
 -----
 
-## 三、四大组件实现原理
+### 三、四大组件实现原理
 
-#### Activity
+四大组件的实现原理依然基于**代理模式**，v2.0 在此基础上进行了优化和加固，但核心思想不变。
 
-采用**单一占坑代理**模型。
+> **核心流程**：
+>
+> 1.  **宿主端配置**：在宿主 `Manifest` 中注册真实的代理组件（如 `HostActivity`, `HostService`），并将其 `Class` 或 `Authority` 告知 `ProxyManager`。
+> 2.  **框架层拦截**：当调用 `startPluginActivity` 等扩展函数时，框架会创建一个指向宿主代理组件的 `Intent`，并将真正的插件组件类名作为 extra 数据放进去。
+> 3.  **代理端分发**：宿主代理组件（如 `HostActivity`）启动后，从 `Intent` 中取出插件类名，通过插件的 `ClassLoader` 反射实例化 `IPluginActivity` 等接口的实现对象。
+> 4.  **生命周期托管**：代理组件调用插件对象的 `onAttach(this)` 注入代理上下文，然后将后续所有生命周期事件（`onResume`, `onPause` 等）一一转发给这个插件实例。
 
-1. **配置**: 你需要在宿主 `Manifest` 中注册一个真实的 `Activity`（如 `HostActivity`），它继承自
-   `BaseHostActivity`。
-2. **启动**: 当你调用 `startPluginActivity(PluginActivity.class)` 时，框架会创建一个指向宿主
-   `HostActivity` 的 `Intent`，并将真正的插件 `Activity` 类名 `"com.example.PluginActivity"` 作为
-   extra 数据放进去。
-3. **代理**: Android 系统启动了 `HostActivity`。在其 `onCreate` 方法中，它会从 `Intent` extra
-   中取出类名，通过插件的 `ClassLoader` 反射实例化 `IPluginActivity` 对象，调用其 `onAttach(this)`
-   注入代理，然后手动调用其 `onCreate()` 并将后续所有生命周期事件（`onResume`, `onPause` 等）一一转发给这个插件
-   `Activity` 实例。
-
-#### Service
-
-采用**代理服务池**模型。
-
-1. **配置**: 你需要在宿主 `Manifest` 中注册**多个**真实的 `Service`（如 `HostService1`,
-   `HostService2`...），并将它们的 `Class` 列表配置到 `ProxyManager` 的服务池中。
-2. **启动**: 当你调用 `startPluginService(PluginService.class, instanceId)` 时，`ProxyManager`
-   会从服务池中取出一个**空闲**的 `HostService`（比如 `HostService2`），并将 `instanceId` 与
-   `HostService2` 绑定。然后，框架会创建一个指向 `HostService2` 的 `Intent`，并将真正的插件 `Service`
-   类名和 `instanceId` 作为 extra 放进去，最后由系统启动 `HostService2`。
-3. **代理**: `HostService2` 启动后，同样地，它会实例化插件 `Service` 并转发所有生命周期事件。当
-   `HostService2` 销毁时，它会通知 `ProxyManager` 将自身返还到可用池中，以供下一个插件 `Service` 使用。
-
-#### BroadcastReceiver
-
-采用**中心化代理分发**模型。
-
-* **静态广播**:
-    1. **解析**: 在插件**安装**时，`InstallerManager` 就会解析其 `Manifest`，提取出所有 `<receiver>`
-       的信息（包括 `intent-filter`）并存入 `plugins.xml`。
-    2. **注册**: 在插件**加载**时，`PluginManager` 将这些信息注册到 `ProxyManager` 的一个内存注册表中。
-    3. **接收**: 你在宿主 `Manifest` 中注册的**唯一**的 `HostReceiver` 接收所有系统广播。
-    4. **分发**: `HostReceiver` 将收到的 `Intent` 交给 `ProxyManager`，`ProxyManager`
-       会查询其内部注册表，找到所有匹配该 `Intent` 的插件 `Receiver`，然后逐个实例化并调用它们的
-       `onReceive` 方法。
-
-#### ContentProvider
-
-采用**URI 代理**模型。
-
-1. **配置**: 你需要在宿主 `Manifest` 中注册一个真实的、拥有**唯一 Authority**（如
-   `com.host.proxy.provider`）的 `HostProvider`。
-2. **调用**: 当你调用 `queryPlugin(pluginUri)` 时，扩展函数会通过 `buildProxyUri` 将一个插件 `Uri`（如
-   `content://plugin.auth/books`）“改造”成一个代理 `Uri`（如
-   `content://com.host.proxy.provider/plugin.auth/books`）。
-3. **代理**: 系统的 `ContentResolver` 会将请求发送给 `HostProvider`。`HostProvider` 接收到请求后，从代理
-   `Uri` 的 `path` 中解析出原始的插件 `Authority` (`plugin.auth`)，通过 `ProxyManager` 找到对应的插件
-   `Provider` 实例，最后将请求（使用原始 `Uri`）转发给真正的插件 `Provider` 处理。
+* **Activity**: 采用**单一占坑代理**模型。
+* **Service**: 采用**代理服务池**模型。
+* **BroadcastReceiver**: 采用**中心化代理分发**模型。
+* **ContentProvider**: 采用**URI 代理**模型。
 
 -----
 
-## 四、关键机制深度解析
+### 四、关键机制深度解析
 
-本章节将深入探讨 `ComboLite` 中几个最具特色的设计，揭示其底层的实现原理。
+#### 1. 动态依赖发现与类加载委托
 
-### 1. 动态依赖发现与类加载委托
+这是 `ComboLite` 实现“无配置依赖”和“闪电般类查找”两大特性的核心机制。它由三个组件协同完成：**全局类索引**、**`PluginClassLoader`** 和 **`DependencyManager`**。
 
-这是 `ComboLite` 实现“无配置依赖”和“闪电般类查找”两大特性的核心机制。它由三个组件协同完成：**全局类索引
-**、**`PluginClassLoader`** 和 **`DependencyManager`**。
+> **工作流程**：“**本地查找 -> 委托仲裁 -> 索引定位 -> 记录依赖 -> 定向加载**”。
+>
+> 1.  插件 A 的 `PluginClassLoader` 在 `findClass` 方法中，首先尝试通过 `super.findClass()` 在本地 `dex` 中查找类。
+> 2.  如果查找失败并捕获 `ClassNotFoundException`，它**不会**立即抛出，而是将查找任务“委托”给 `DependencyManager`。
+> 3.  `DependencyManager` 作为 `IPluginFinder` 接口的实现，会查询**全局类索引**，发现这个类属于插件 B。
+> 4.  `DependencyManager` 动态地在内部的**两个依赖图**中，记录下 `A -> B` 的依赖关系。
+> 5.  `DependencyManager` 随后获取插件 B 的 `ClassLoader`，并调用其 **`findClassLocally`** 方法。这个方法直接调用 `super.findClass()`，从而直接从插件 B 的 `dex` 文件中加载所需的类，然后返回给插件 A。`findClassLocally` **不会再次委托**，从而避免了无限递归。
+> 6.  如果 `DependencyManager` 也找不到，`PluginClassLoader` 才会抛出一个特殊的 `PluginDependencyException`。
 
-#### **第一步: 全局类索引 (The "Map") - O(1) 查找**
+#### 2. 依赖图谱与链式重启
 
-在插件加载时，`PluginManager` 会使用 `dexlib2` 库扫描插件 APK，并建立一个全局的
-`ConcurrentHashMap<ClassName, PluginId>` 索引。这个索引就像一本全局电话簿，清晰地记录了“哪个类住在哪个插件里”。它将传统插件框架中
-`O(n)` 的类查找复杂度，优化为了 `O(1)` 的哈希查找。
+**“链式重启”** 是 `ComboLite` 保证热更新后状态一致性的核心安全机制。它的实现完全依赖于 `DependencyManager` 在运行时动态构建的**反向依赖图 (`dependentGraph`)**。
 
-#### **第二步: `PluginClassLoader` (The "Requester") - 发起请求**
+> **工作原理**:
+>
+> 1.  **触发**: 当对一个已加载的插件 B 调用 `PluginManager.launchPlugin("plugin-B")` 时，`PluginLifecycleManager` 识别出这是一个“重启”请求。
+> 2.  **查询依赖方**: `PluginLifecycleManager` 会立即调用 `dependencyManager.findDependentsRecursive("plugin-B")`。
+> 3.  **图遍历**: `findDependentsRecursive` 方法会在**反向依赖图**上，从 `plugin-B` 节点开始进行一次**深度优先搜索 (DFS)**，找出所有直接或间接依赖于 `plugin-B` 的插件（例如 `A` 和 `C`）。
+> 4.  **制定重启计划**: 搜索结果与触发点合并，形成完整的重启列表 `[A, C, B]`。
+> 5.  **执行计划**: `PluginLifecycleManager` 会严格按照**依赖关系的逆序**（先 `A` 和 `C`，最后 `B`）依次**卸载**这些插件，然后再按**正序**依次**重新加载**它们，确保整个依赖链上的所有插件都被更新。
 
-每个插件都有一个自己的 `PluginClassLoader`。当插件 A 的代码尝试加载一个类（如 `new ClassFromPluginB()`
-）时，它的 `ClassLoader` 会执行重写后的 `findClass` 方法：
+#### 3. **全新：权限与授权机制 (v2.0 核心)**
 
-1. **本地查找**: 首先，它会像普通的 `ClassLoader` 一样，在自己的 `dex` 文件中查找这个类。
-2. **查找失败**: 如果在本地找不到，它**不会**立即抛出 `ClassNotFoundException`，而是将这个查找任务“委托”给
-   `DependencyManager`。
-3. **最终失败**: 如果 `DependencyManager` 也找不到，`PluginClassLoader` 才会抛出一个特殊的、携带了“肇事插件ID”的
-   `PluginDependencyException`。这个异常是实现“崩溃熔断”的关键信号。
+这是 v2.0 最重大的架构升级，旨在为框架提供企业级的安全性。
 
-#### **第三步: `DependencyManager` (The "Arbiter") - 仲裁与记录**
+1.  **注解式声明**: 框架通过 `@RequiresPermission` 注解，为 `PluginManager` 等核心类中的敏感 API（如 `setPluginEnabled`）声明了所需的权限等级 (`HOST` 或 `SELF`) 和失败模式 (`hardFail`)。
+2.  **调用者追踪**: 当插件调用这些敏感 API 时，扩展函数 `checkApiCaller` 会通过分析调用堆栈 (`Thread.currentThread().stackTrace`)，并对照全局类索引，精准地识别出发起调用的插件 ID。
+3.  **静态权限检查**: `AuthorizationManager` 首先将调用信息封装成 `AuthorizationRequest`，交给 `PermissionManager` 进行**静态检查**。`PermissionManager` 会基于严格的规则（如：调用 `HOST` 级别 API 的插件，其签名摘要是否与宿主缓存的摘要一致）快速做出判断。
+4.  **动态用户授权**: 如果静态检查失败，且 API 没有被标记为 `hardFail=true`，`AuthorizationManager` 会将请求流转给 `IAuthorizationHandler` 接口的实现。默认情况下，`DefaultAuthorizationHandler` 会启动一个内置的 `AuthorizationActivity`，向用户展示本次操作的详细信息，并请求用户授权。宿主也可以通过 `setAuthorizationHandler` 替换掉这个默认 UI，实现完全自定义的授权流程。
 
-`DependencyManager` 作为 `IPluginFinder` 接口的实现，是整个流程的“仲裁者”。当它收到来自插件 A 的类查找请求时：
+这套“**注解声明 -> 静态检查 -> 动态授权**”的闭环流程，为 `ComboLite` 构筑了一道坚实而灵活的安全防线。
 
-1. **查询索引**: 它会拿着类名去查询**全局类索引**，发现这个类属于插件 B。
-2. **记录依赖**: 这是最关键的一步！`DependencyManager` 会在内部的**两个依赖图**中，动态地记录下这条依赖关系：
-    * **正向依赖图**: `dependencyGraph` 中记录 `A -> B` (A 依赖 B)。
-    * **反向依赖图**: `dependentGraph` 中记录 `B <- A` (B 被 A 依赖)。
-3. **定向加载**: `DependencyManager` 随后获取插件 B 的 `ClassLoader`，并调用其 `findClassLocally`
-   方法，直接从插件 B 的 `dex` 文件中加载所需的类，然后返回给插件 A。`findClassLocally`
-   不会再次委托，从而避免了无限递归。
+#### 4. 崩溃熔断与自愈
 
-这个“**本地查找 -> 委托仲裁 -> 索引定位 -> 记录依赖 -> 定向加载**
-”的闭环，优雅地实现了完全动态、按需记录的依赖关系，开发者无需任何手动配置。
+这是 `ComboLite` 的“最后一道防线”，在 v2.0 中得到了重构和增强。
 
-### 2. 依赖图谱与链式重启
-
-**“链式重启”** 是 `ComboLite` 保证热更新后状态一致性的核心安全机制。它的实现完全依赖于
-`DependencyManager` 在运行时动态构建的**反向依赖图 (`dependentGraph`)**。
-
-**工作原理**:
-
-1. **触发**: 当你对一个已加载的插件 B 调用 `PluginManager.launchPlugin("plugin-B")`
-   时，框架识别出这是一个“重启”请求。
-2. **查询依赖方**: `PluginManager` 会立即调用
-   `dependencyManager.findDependentsRecursive("plugin-B")`。
-3. **图遍历**: `findDependentsRecursive` 方法会在**反向依赖图**上，从 `plugin-B` 节点开始进行一次*
-   *深度优先搜索 (DFS)**，找出所有直接或间接依赖于 `plugin-B` 的插件（例如 `A` 和 `C`，`C` 依赖 `A`，`A`
-   依赖 `B`）。
-4. **制定重启计划**: 搜索结果 `[A, C]` 与触发点 `B` 合并，形成完整的重启列表 `[A, B, C]`。
-5. **执行计划**: `PluginManager` 会严格按照**依赖关系的逆序**（先 `C`，再 `A`，最后 `B`）依次**卸载**
-   这些插件，然后再按**正序**依次**重新加载**它们。
-
-这个基于图遍历的自动化流程，确保了任何一个底层插件的更新，都会让所有依赖它的上层插件也一并更新，从而彻底杜绝了因新旧代码混用而导致的运行时崩溃。
-
-### 3. 崩溃熔断与自愈
-
-这是 `ComboLite` 提供的“最后一道防线”，旨在防止因单个插件的依赖问题（如宿主升级后忘记提供某个库）导致整个应用陷入无限崩溃的循环。
-
-**工作原理**:
-
-1. **信号**: 当 `PluginClassLoader` 在所有地方都找不到一个类时，它会抛出 `PluginDependencyException`
-   。这个异常是触发熔断的**唯一信号**。
-2. **捕获**: `PluginCrashHandler` 在应用启动时通过 `Thread.setDefaultUncaughtExceptionHandler`
-   注册为了全局崩溃处理器。它的 `uncaughtException` 方法会捕获所有未处理的异常。
-3. **精准识别**: 它会递归遍历异常链 (`Throwable.cause`)，专门查找 `PluginDependencyException`
-   。如果是其他类型的崩溃（如 `NullPointerException`），它会直接交由系统默认处理器处理，让应用正常崩溃。
-4. **执行熔断**: 一旦识别出是 `PluginDependencyException`，处理器会：
-    * 从异常对象中提取出“肇事插件”的 ID (`culpritPluginId`)。
-    * 调用 `PluginManager.setPluginEnabled(culpritPluginId, false)`，将该插件的启动状态**持久化地**
-      修改为禁用。
-    * 启动一个友好的 `CrashActivity` 错误提示页面，告知用户某个功能模块已临时禁用，并引导用户重启应用，而不是让应用直接闪退或陷入重启循环。
-
-通过这套“**特定异常信号 -> 全局捕获 -> 精准识别 -> 自动禁用 -> 友好提示**”的流程，`ComboLite`
-将一个可能导致应用瘫痪的致命错误，转化为一个可隔离、可自动恢复的局部问题，极大地提升了应用的健壮性。
+> **工作原理**：
+>
+> 1.  **信号**: 当 `PluginClassLoader` 抛出 `PluginDependencyException` 时，这是触发熔断的关键**信号**。
+> 2.  **捕获与识别**: `PluginCrashHandler` 作为全局异常处理器，会捕获所有未处理的异常，并精准识别出是否由 `PluginDependencyException` 等插件相关异常引起。
+> 3.  **分级委托**: 处理器会优先检查崩溃插件自身是否注册了专属的 `IPluginCrashCallback`。如果有，则交由其处理。如果没有，则检查宿主是否注册了**全局回调**。
+> 4.  **默认熔断**: 如果所有回调都未处理该异常，`PluginCrashHandler` 将执行默认的熔断逻辑：启动一个友好的 `CrashActivity`，引导用户选择**禁用肇事插件并重启应用**，从而实现应用的自愈，避免陷入无限崩溃的循环。
 
 -----
 
-## 五、关键设计抉择
+### 五、关键设计抉择
 
 * **为什么是 0 Hook？**
-  为了**极致的稳定和未来的兼容性**。Android 系统对非公开 API 的限制日益收紧，任何基于 Hook
-  的方案都面临着在新系统版本上失效的巨大风险。`ComboLite` 选择了一条更“艰难”但更正确的道路，完全依赖官方公开的
-  API 和代理模式，虽然在某些极端场景（如复杂的 `launchMode`）上有所取舍，但换来的是坚如磐石的长期可靠性。
+
+  > 为了**极致的稳定和未来的兼容性**。Android 系统对非公开 API 的限制日益收紧，任何基于 Hook 的方案都面临着在新系统版本上失效的巨大风险。`ComboLite` 选择了一条更“艰难”但更正确的道路，完全依赖官方公开的 API 和代理模式，虽然在某些极端场景（如复杂的 `launchMode`）上有所取舍，但换来的是坚如磐石的长期可靠性。
 
 * **为什么需要类索引？**
-  为了**闪电般的跨插件类查找性能**。传统的插件化框架在跨插件寻找类时，往往需要遍历一个由多个
-  `ClassLoader` 组成的链表，这是一个 `O(n)` 的操作，在插件数量多时性能低下。`ComboLite`
-  在插件加载时，预先扫描所有类并建立一个全局 `HashMap` 索引，将类查找操作的时间复杂度降至 `O(1)`
-  ，保证了应用的流畅运行。
+
+  > 为了**闪电般的跨插件类查找性能**。传统的插件化框架在跨插件寻找类时，往往需要遍历一个由多个 `ClassLoader` 组成的链表，这是一个 `O(n)` 的操作。`ComboLite` 在插件安装时，通过 `dexlib2` 预先扫描所有类并建立一个全局 `HashMap` 索引，将类查找操作的时间复杂度降至 `O(1)`，保证了应用的流畅运行。
 
 * **为什么有“链式重启”？**
-  为了**热更新后的状态一致性**。在复杂的依赖关系中，更新一个底层的核心插件而不重启依赖它的上游插件，极易导致
-  `NoSuchMethodError` 等各种因新旧代码混用而引发的崩溃。`链式重启` 机制通过 `DependencyManager`
-  自动分析出所有受影响的插件，并以“原子操作”的方式将它们作为一个整体进行更新，从根本上杜绝了状态不一致的问题。
+
+  > 为了**热更新后的状态一致性**。在复杂的依赖关系中，更新一个底层的核心插件而不重启依赖它的上游插件，极易导致 `NoSuchMethodError` 等各种因新旧代码混用而引发的崩溃。`链式重启` 机制通过 `DependencyManager` 自动分析出所有受影响的插件，并以“原子操作”的方式将它们作为一个整体进行更新，从根本上杜绝了状态不一致的问题。
+
+* **为什么引入 v2.0 的安全体系？**
+
+  > 为了**企业级的健壮性和开放性**。v1.0 的隐式信任模型过于脆弱，无法支撑一个开放的插件生态。v2.0 的安全体系，使得构建一个开放的“插件市场”成为可能：宿主可以大胆地允许用户安装未知来源的插件，因为所有高风险操作都被权限系统牢牢掌控，最终决定权始终在用户手中，实现了安全与灵活的完美平衡。
 
 * **为什么资源是合并式而非隔离式？**
-  为了**卓越的开发者体验**。资源的严格隔离实现起来极其复杂，且在绝大多数场景下并非必要。`ComboLite`
-  采用的合并式资源管理，让开发者可以“忘记”资源的出处，像开发单体应用一样透明地使用任何插件的资源。这极大地简化了插件的开发和UI协作。当然，这也要求开发者有良好的资源命名规范，以避免命名冲突。
 
+  > 为了**卓越的开发者体验**。资源的严格隔离实现起来极其复杂，且在绝大多数场景下并非必要。`ComboLite` 采用的合并式资源管理，让开发者可以“忘记”资源的出处，像开发单体应用一样透明地使用任何插件的资源。这极大地简化了插件的开发和 UI 协作。当然，这也要求开发者有良好的资源命名规范，以避免命名冲突。

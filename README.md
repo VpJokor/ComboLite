@@ -94,8 +94,6 @@
 
 `ComboLite` 采用简洁而强大的微核设计，通过分层架构实现高度的内聚和解耦，逻辑清晰，易于扩展。
 
-#### 框架分层结构
-
 ```mermaid
 graph TD
     subgraph " "
@@ -133,61 +131,6 @@ graph TD
     PluginManagerAPI & IPlugin & BaseClasses --> LifecycleManager & InstallerManager & ResourceManager
     LifecycleManager & InstallerManager & ResourceManager --> Loader & Proxy & Security
     Loader & Proxy & Security --> Android
-```
-
-#### 内部组件交互
-
-```mermaid
-graph TD
-    subgraph "宿主应用 & 系统"
-        HostApp[宿主应用代码] -- 调用 API --> PM(PluginManager)
-        AndroidSystem[Android 系统] -- 与...交互 --> HostProxies["宿主代理组件<br>(HostActivity, HostService...)"]
-    end
-
-    subgraph "ComboLite 核心服务"
-        PM -- 协调 --> Installer(InstallerManager)
-        PM -- 协调 --> ResManager(PluginResourcesManager)
-        PM -- 协调 --> ProxyM(ProxyManager)
-        PM -- 协调 --> DepManager(DependencyManager)
-        PM -- 协调 --> Lifecycle(PluginLifecycleManager)
-        PM -- 协调 --> Security(Security Managers)
-    end
-    
-    subgraph "运行时 & 数据状态"
-        OnDiskState["磁盘状态<br>plugins.xml, APKs"]
-        InMemoryState["内存状态<br>已加载插件, 类加载器, 实例"]
-        ClassIndex["全局类索引<br>Map<类, 插件ID>"]
-        DepGraph["依赖图<br>(正向 & 反向)"]
-        MergedRes["合并后的资源"]
-    end
-
-    subgraph "安全体系 (Security)"
-        Security -- 包含 --> PermManager(PermissionManager)
-        Security -- 包含 --> AuthManager(AuthorizationManager)
-        Security -- 包含 --> Validator(SignatureValidator)
-    end
-    
-    %% --- 职责关联 ---
-    Installer -- "管理" --> OnDiskState
-    PM -- "管理" --> InMemoryState
-    PM -- "构建 & 持有" --> ClassIndex
-    DepManager -- "构建 & 持有" --> DepGraph
-    ResManager -- "创建 & 持有" --> MergedRes
-    ProxyM -- "管理" --> HostProxies
-    
-    %% --- 关键交互: 类加载器委托 ---
-    subgraph "关键交互: 跨插件类查找"
-        direction LR
-        style RequesterPCL fill:#f9f,stroke:#333,stroke-width:2px
-        style TargetPCL fill:#ccf,stroke:#333,stroke-width:2px
-        
-        RequesterPCL["请求方<br>PluginClassLoader"] -- "findClass() 失败时委托" --> DepManager
-        DepManager -- "1. 查索引" --> ClassIndex
-        DepManager -- "2. 记录依赖" --> DepGraph
-        DepManager -- "3. 从目标加载" --> TargetPCL["目标<br>PluginClassLoader"]
-    end
-    
-    InMemoryState -- 包含 --> RequesterPCL & TargetPCL
 ```
 
 -----

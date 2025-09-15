@@ -96,8 +96,6 @@ As the Android ecosystem evolves, plugin frameworks born in the View era are str
 
 `ComboLite` employs a concise and powerful micro-kernel design. It achieves high cohesion and decoupling through a layered architecture, resulting in clear logic that is easy to extend.
 
-#### Framework Layered Structure
-
 ```mermaid
 graph TD
     subgraph " "
@@ -135,61 +133,6 @@ graph TD
     PluginManagerAPI & IPlugin & BaseClasses --> LifecycleManager & InstallerManager & ResourceManager
     LifecycleManager & InstallerManager & ResourceManager --> Loader & Proxy & Security
     Loader & Proxy & Security --> Android
-```
-
-#### Internal Component Interaction
-
-```mermaid
-graph TD
-    subgraph "Host App & System"
-        HostApp[Host App Code] -- Calls API --> PM(PluginManager)
-        AndroidSystem[Android System] -- Interacts with --> HostProxies["Host Proxy Components<br>(HostActivity, HostService...)"]
-    end
-
-    subgraph "ComboLite Core Services"
-        PM -- Coordinates --> Installer(InstallerManager)
-        PM -- Coordinates --> ResManager(PluginResourcesManager)
-        PM -- Coordinates --> ProxyM(ProxyManager)
-        PM -- Coordinates --> DepManager(DependencyManager)
-        PM -- Coordinates --> Lifecycle(PluginLifecycleManager)
-        PM -- Coordinates --> Security(Security Managers)
-    end
-    
-    subgraph "Runtime & Data State"
-        OnDiskState["On-Disk State<br>plugins.xml, APKs"]
-        InMemoryState["In-Memory State<br>Loaded Plugins, ClassLoaders, Instances"]
-        ClassIndex["Global Class Index<br>Map<Class, PluginID>"]
-        DepGraph["Dependency Graph<br>(Forward & Reverse)"]
-        MergedRes["Merged Resources"]
-    end
-
-    subgraph "Security System"
-        Security -- Includes --> PermManager(PermissionManager)
-        Security -- Includes --> AuthManager(AuthorizationManager)
-        Security -- Includes --> Validator(SignatureValidator)
-    end
-    
-    %% --- Responsibility Links ---
-    Installer -- "Manages" --> OnDiskState
-    PM -- "Manages" --> InMemoryState
-    PM -- "Builds & Holds" --> ClassIndex
-    DepManager -- "Builds & Holds" --> DepGraph
-    ResManager -- "Creates & Holds" --> MergedRes
-    ProxyM -- "Manages" --> HostProxies
-    
-    %% --- Key Interaction: ClassLoader Delegation ---
-    subgraph "Key Interaction: Cross-Plugin Class Lookup"
-        direction LR
-        style RequesterPCL fill:#f9f,stroke:#333,stroke-width:2px
-        style TargetPCL fill:#ccf,stroke:#333,stroke-width:2px
-        
-        RequesterPCL["Requester<br>PluginClassLoader"] -- "Delegates on findClass() failure" --> DepManager
-        DepManager -- "1. Look up index" --> ClassIndex
-        DepManager -- "2. Record dependency" --> DepGraph
-        DepManager -- "3. Load from target" --> TargetPCL["Target<br>PluginClassLoader"]
-    end
-    
-    InMemoryState -- Contains --> RequesterPCL & TargetPCL
 ```
 
 -----
