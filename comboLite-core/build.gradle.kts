@@ -90,7 +90,7 @@ mavenPublishing {
     signAllPublications()
     val groupId = "io.github.lnzz123"
     val artifactId = "combolite-core"
-    val version = "2.0.0"
+    val version = "2.0.1"
     coordinates(groupId, artifactId, version)
     pom {
         name.set("ComboLite Core")
