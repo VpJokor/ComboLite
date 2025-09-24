@@ -22,7 +22,6 @@ import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
 import timber.log.Timber
-import java.io.File
 import java.security.MessageDigest
 
 
@@ -119,7 +118,7 @@ internal object SignatureValidator {
         val packageManager = context.packageManager
         try {
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                PackageManager.GET_SIGNING_CERTIFICATES
+                PackageManager.GET_SIGNING_CERTIFICATES or PackageManager.GET_SIGNATURES
             } else {
                 PackageManager.GET_SIGNATURES
             }
@@ -146,7 +145,6 @@ internal object SignatureValidator {
                 packageInfo.signatures?.toSet()
             }
 
-            // 如果获取的是宿主签名，则进行缓存
             if (!isApkFile && signatures != null) {
                 hostSignaturesCache = signatures
             }

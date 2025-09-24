@@ -43,6 +43,9 @@ internal class ApkSigner(
                 "--ks-key-alias", config.keyAlias.get(),
                 "--key-pass", "pass:${config.keyPassword.get()}",
                 "--min-sdk-version", "21",
+                "--v1-signing-enabled", "true",
+                "--v2-signing-enabled", "true",
+                "--v3-signing-enabled", "true",
                 "--v4-signing-enabled", "false",
                 "--out", outputFile.absolutePath,
                 unsignedApk.absolutePath

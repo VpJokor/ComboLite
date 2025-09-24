@@ -28,7 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -48,10 +47,6 @@ import org.koin.androidx.compose.koinViewModel
 fun LoadingScreen(viewModel: LoadingViewModel = koinViewModel()) {
     val loading by viewModel.loading.collectAsState()
     val entryClass by viewModel.entryClass.collectAsState()
-
-    LaunchedEffect(Unit) {
-        viewModel.setupPlugins()
-    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),

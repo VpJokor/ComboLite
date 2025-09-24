@@ -22,3 +22,30 @@
 -dontshrink
 -dontoptimize
 -dontwarn javax.lang.model.**
+
+# 忽略关于 Jetpack Compose 动画工具库中类的缺失警告。
+-dontwarn androidx.compose.animation.tooling.**
+-dontwarn androidx.window.sidecar.**
+-dontwarn androidx.window.extensions.**
+-dontwarn androidx.compose.animation.tooling.**
+-dontwarn androidx.compose.animation.tooling.ComposeAnimatedProperty
+-dontwarn androidx.compose.animation.tooling.TransitionInfo
+-dontwarn androidx.window.extensions.area.ExtensionWindowAreaStatus
+-dontwarn androidx.window.extensions.area.WindowAreaComponent
+-dontwarn androidx.window.extensions.embedding.ActivityEmbeddingComponent
+-dontwarn androidx.window.extensions.embedding.ActivityRule$Builder
+-dontwarn androidx.window.extensions.embedding.ActivityRule
+-dontwarn androidx.window.extensions.embedding.ActivityStack
+-dontwarn androidx.window.extensions.embedding.EmbeddingRule
+-dontwarn androidx.window.extensions.embedding.SplitAttributes$Builder
+-dontwarn androidx.window.extensions.embedding.SplitAttributes$SplitType$ExpandContainersSplitType
+-dontwarn androidx.window.extensions.embedding.SplitAttributes$SplitType$HingeSplitType
+-dontwarn androidx.window.extensions.embedding.SplitAttributes$SplitType$RatioSplitType
+-dontwarn androidx.window.extensions.embedding.SplitAttributes$SplitType
+-dontwarn androidx.window.extensions.embedding.SplitAttributes
+-dontwarn androidx.window.extensions.embedding.SplitAttributesCalculatorParams
+-dontwarn androidx.window.extensions.embedding.SplitInfo
+-dontwarn androidx.window.extensions.embedding.SplitPairRule$Builder
+-dontwarn androidx.window.extensions.embedding.SplitPairRule
+-dontwarn androidx.window.extensions.embedding.SplitPlaceholderRule$Builder
+-dontwarn androidx.window.extensions.embedding.SplitPlaceholderRule

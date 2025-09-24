@@ -83,6 +83,7 @@ class LoadingViewModel(
                 }
                 .launchIn(viewModelScope)
         }
+        setupPlugins()
     }
 
     fun setupPlugins() {
